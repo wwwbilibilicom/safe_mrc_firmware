@@ -1,0 +1,22 @@
+{
+    "files.associations": {
+        "drv_mrc.h": "c",
+        "array_user.h": "c",
+        "mrc_com.h": "c",
+        "mrc_protocol.h": "c",
+        "math.h": "c",
+        "drv_encoder.h": "c",
+        "drv_vnh7040.h": "c",
+        "stdio.h": "c",
+        "drv_led.h": "c",
+        "main.h": "c",
+        "crc_ccitt.h": "c",
+        "drv_key.h": "c",
+        "usart.h": "c",
+        "string.h": "c",
+        "pid_controller.h": "c",
+        "filter.h": "c"
+    },
+    "Codegeex.Comment.LanguagePreference": "English",
+    "Codegeex.CommitMessage.LanguagePreference": "English"
+}
