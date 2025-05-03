@@ -25,7 +25,7 @@ void drv_key_init(device_key_t * dev_key, const char * name, GPIO_TypeDef * GPIO
     dev_key->GPIO_Port = GPIO_Port;
     dev_key->GPIO_Pin = GPIO_Pin;
     
-    printf("key init ok\r\n");
+    printf("Key %s initialized.\n", dev_key->name);
 }
 
 /**

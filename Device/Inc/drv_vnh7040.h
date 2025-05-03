@@ -20,8 +20,6 @@ typedef struct Device_VNH7040_t
     GPIO_TypeDef *INA;
     uint32_t INA_PIN;
     ADC_HandleTypeDef *ADC_handle;
-    uint32_t ADC_BUFFER;
-
     GPIO_TypeDef *INB;
     uint32_t INB_PIN;
     float des_voltage; // Desired voltage of the device

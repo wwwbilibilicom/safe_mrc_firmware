@@ -57,13 +57,12 @@ extern "C"
         PID_Controller coil_pid; // PID controller for the coil
 
         int (*LOG_MSG)(const char *format, ...); // Function pointer to log messages
-        float des_voltage;                       // Voltage of the MR device
-        uint8_t STATE_UPDATE_FLAG;               // Flag to update the state_phase
+        uint8_t State_Update_Flag;               // Flag to update the state_phase
         uint8_t demagnetization_counter;         // Counter for demagnetization
         uint8_t magnetization_counter;
         uint8_t COLLISION_REACT_FLAG;            // flag to execute collision reaction
+        uint8_t control_loop_flag;               // flag to execute control loop
 
-        float actual_voltage; // Counter for magnetization
     } Device_MRC_t;
 #pragma pack()
     void MRC_Init(const uint8_t *dev_name, Device_MRC_t *MRC, uint8_t id); 

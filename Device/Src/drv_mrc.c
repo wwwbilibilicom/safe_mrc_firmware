@@ -16,22 +16,13 @@ extern DMA_HandleTypeDef hdma_usart2_rx;
 #define Encoder_CH TIM_CHANNEL_4 // timer channel for encoder
 #define PWM_TIM htim2 // PWM timer handle to generate the PWM for the VNH7040 device
 #define PWM_CH TIM_CHANNEL_1
-#define ADC_handle hadc1 // ADC handle for the VNH7040 device
+#define ADC_HANDLE hadc1 // ADC handle for the VNH7040 device
 
 /**
  * @brief Initialize the MRC device
  *
  * This function initializes the MRC device, including setting the device name, timer handle, PWM channel, INA and INB
  * pins, etc.
- *
- * @param dev_name Device name
- * @param MRC Pointer to the MRC device structure
- * @param htim Timer handle
- * @param INA GPIO port for INA pin
- * @param INA_PIN GPIO pin number for INA pin
- * @param INB GPIO port for INB pin
- * @param INB_PIN GPIO pin number for INB pin
- * @param PWM PWM channel
  *
  * @details
  * The function first assigns the passed parameters to the MRC device structure, then starts the PWM channel of the
@@ -40,34 +31,6 @@ extern DMA_HandleTypeDef hdma_usart2_rx;
  *
  * @note
  * This function assumes that the ADC_BUFFER array has been defined and contains two ADC values.
- *
- * @code
- * void MRC_Init(const uint8_t *dev_name, Device_MRC_t *MRC, TIM_HandleTypeDef *htim,
- *              GPIO_TypeDef * INA, uint16_t INA_PIN,
- *              GPIO_TypeDef * INB,  uint16_t INB_PIN,
- *              uint32_t PWM)
- * {
- *     MRC->device_name = dev_name;
- *     MRC->pwm_handle = htim;
- *     MRC->PWM = PWM;                                         //PWM channel
- *     MRC->INA = INA;                                         //INA GPIO
- *     MRC->INA_PIN = INA_PIN;                                 //INA PIN
- *
- *     MRC->INB = INB;                                         //INB GPIO
- *     MRC->INB_PIN = INB_PIN;                                 //INB PIN
- *
- *     MRC->LOG_MSG = printf;
- *     HAL_TIM_PWM_Start(htim, PWM);
- *     MRC_set_pwm_param(htim, PWM, MRC_PWM_FREQ, 0);
- *     HAL_GPIO_WritePin(INA,INA_PIN,GPIO_PIN_SET);
- *     HAL_GPIO_WritePin(INB,INB_PIN,GPIO_PIN_RESET);
- *
- *     HAL_ADCEx_Calibration_Start(&hadc1, ADC_CALIB_OFFSET_LINEARITY,ADC_SINGLE_ENDED);
- *     HAL_ADC_Start_DMA(&hadc1,(uint32_t *)&ADC_BUFFER,2);
- *
- *     printf("device MRC(%s) init success!\n", dev_name);
- * }
- * @endcode
  */
 void MRC_Init(const uint8_t *dev_name, Device_MRC_t *MRC, uint8_t id)
 {
@@ -88,9 +51,9 @@ void MRC_Init(const uint8_t *dev_name, Device_MRC_t *MRC, uint8_t id)
     drv_key_init(&MRC->KEY1, "KEY1", KEY1_GPIO_Port, KEY1_Pin);         // KEY1 GPIO
     drv_key_init(&MRC->KEY2, "KEY2", KEY2_GPIO_Port, KEY2_Pin);         // KEY1 GPIO
     drv_encoder_init(&MRC->Encoder, &H_Encoder, Encoder_CH); // Encoder GPIO
-    drv_VNH7040_init("H-driver", &MRC->VNH7040, INA1_GPIO_Port, INA1_Pin, INB1_GPIO_Port, INB1_Pin, &PWM_TIM, PWM_CH, &ADC_handle); // VNH7040 device structure
+    drv_VNH7040_init("H-driver", &MRC->VNH7040, INA1_GPIO_Port, INA1_Pin, INB1_GPIO_Port, INB1_Pin, &PWM_TIM, PWM_CH, &hadc1); // VNH7040 device structure
     
-    PID_Init(&MRC->coil_pid, 0.1f, 0.0f, 0.01f, 0.01f, MRC_COIL_MAX_VOLTAGE, -MRC_COIL_MAX_VOLTAGE); // PID controller for the coil
+    PID_Init(&MRC->coil_pid, 0.1f, 0.0f, 0.01f, 0.001f, MRC_COIL_MAX_VOLTAGE, -MRC_COIL_MAX_VOLTAGE); // PID controller for the coil
     
     MRC->state_phase = Disengagement;
 
@@ -126,14 +89,14 @@ void MRC_set_voltage(Device_MRC_t *MRC)
         MRC->VNH7040.des_voltage = -MRC_COIL_MAX_VOLTAGE; // Set the desired voltage to the minimum voltage
     }
     VNH7070_Multisense_ADC_process(&MRC->VNH7040); // Process the ADC data
-
+#if 0
     VNH7040_Set_Voltage(&MRC->VNH7040, 
         PID_Calculate(  &MRC->coil_pid, 
                         MRC->VNH7040.des_voltage, 
                         MRC->VNH7040.actual_voltage)); // Set the voltage of the VNH7040 device
+#endif
+    VNH7040_Set_Voltage(&MRC->VNH7040, MRC->VNH7040.des_voltage); // Set the voltage of the VNH7040 device
 }
-
-
 
 /**
  * @brief Detect collisions in the MRC device.
@@ -254,7 +217,7 @@ void MRC_Key1_Reaction(Device_MRC_t *MRC)
     {
         MRC->KEY1.key_flag = 0; // clear the flag
         led_toggle(&MRC->LED1); // toggle LED1 state
-        MRC->VNH7040.des_voltage -= 0.5f; // drecease the voltage by 1.0V
+        MRC->VNH7040.des_voltage -= 0.1f; // drecease the voltage by 1.0V
         if(MRC->VNH7040.des_voltage >=-MRC_COIL_MAX_VOLTAGE) // voltage is greater than or equal to the minimum voltage
         {
             MRC_set_voltage(MRC); // set the new voltage
@@ -284,7 +247,7 @@ void MRC_Key2_Reaction(Device_MRC_t *MRC)
     {
         MRC->KEY2.key_flag = 0; // clear the flag
         led_toggle(&MRC->LED2); // toggle LED2 state
-        MRC->VNH7040.des_voltage += 0.5f; // increase the voltage by 1.0V
+        MRC->VNH7040.des_voltage += 0.1f; // increase the voltage by 1.0V
         if(MRC->VNH7040.des_voltage <= MRC_COIL_MAX_VOLTAGE) // the voltage is less than the maximum voltage
         {
             MRC_set_voltage(MRC); // set the new voltage

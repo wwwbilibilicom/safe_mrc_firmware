@@ -121,6 +121,11 @@ int main(void)
     MRC_Com_Exchange(&MRC);
     MRC_Key1_Reaction(&MRC);
     MRC_Key2_Reaction(&MRC);
+    if(MRC.control_loop_flag == 1)
+    {
+      MRC.control_loop_flag = 0;
+      VNH7070_Multisense_ADC_process(&MRC.VNH7040);
+    }
   }
   /* USER CODE END 3 */
 }
@@ -209,6 +214,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	{
     Keyscan(&MRC.KEY1);
     Keyscan(&MRC.KEY2);
+    if (MRC.control_loop_flag == 0)
+    {
+      MRC.control_loop_flag = 1;
+    }
   }
 }
 

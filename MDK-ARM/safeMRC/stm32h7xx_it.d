@@ -7,7 +7,7 @@ safemrc\stm32h7xx_it.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_def.h
 safemrc\stm32h7xx_it.o: ../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h7xx.h
 safemrc\stm32h7xx_it.o: ../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h750xx.h
 safemrc\stm32h7xx_it.o: ../Drivers/CMSIS/Include/core_cm7.h
-safemrc\stm32h7xx_it.o: C:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+safemrc\stm32h7xx_it.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
 safemrc\stm32h7xx_it.o: ../Drivers/CMSIS/Include/cmsis_version.h
 safemrc\stm32h7xx_it.o: ../Drivers/CMSIS/Include/cmsis_compiler.h
 safemrc\stm32h7xx_it.o: ../Drivers/CMSIS/Include/cmsis_armcc.h
@@ -15,8 +15,8 @@ safemrc\stm32h7xx_it.o: ../Drivers/CMSIS/Include/mpu_armv7.h
 safemrc\stm32h7xx_it.o: ../Drivers/CMSIS/Device/ST/STM32H7xx/Include/system_stm32h7xx.h
 safemrc\stm32h7xx_it.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h
 safemrc\stm32h7xx_it.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy/stm32_hal_legacy.h
-safemrc\stm32h7xx_it.o: C:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stddef.h
-safemrc\stm32h7xx_it.o: C:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
+safemrc\stm32h7xx_it.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stddef.h
+safemrc\stm32h7xx_it.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
 safemrc\stm32h7xx_it.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_rcc_ex.h
 safemrc\stm32h7xx_it.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_gpio.h
 safemrc\stm32h7xx_it.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_gpio_ex.h
@@ -53,4 +53,4 @@ safemrc\stm32h7xx_it.o: ../Device/Inc/mrc_com.h
 safemrc\stm32h7xx_it.o: ../Device/Inc/mrc_protocol.h
 safemrc\stm32h7xx_it.o: ../Device/Inc/drv_vnh7040.h
 safemrc\stm32h7xx_it.o: ..\Common\Inc\pid_controller.h
-safemrc\stm32h7xx_it.o: C:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdbool.h
+safemrc\stm32h7xx_it.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdbool.h

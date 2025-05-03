@@ -8,7 +8,7 @@ safemrc\gpio.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_def.h
 safemrc\gpio.o: ../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h7xx.h
 safemrc\gpio.o: ../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h750xx.h
 safemrc\gpio.o: ../Drivers/CMSIS/Include/core_cm7.h
-safemrc\gpio.o: C:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+safemrc\gpio.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
 safemrc\gpio.o: ../Drivers/CMSIS/Include/cmsis_version.h
 safemrc\gpio.o: ../Drivers/CMSIS/Include/cmsis_compiler.h
 safemrc\gpio.o: ../Drivers/CMSIS/Include/cmsis_armcc.h
@@ -16,8 +16,8 @@ safemrc\gpio.o: ../Drivers/CMSIS/Include/mpu_armv7.h
 safemrc\gpio.o: ../Drivers/CMSIS/Device/ST/STM32H7xx/Include/system_stm32h7xx.h
 safemrc\gpio.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h
 safemrc\gpio.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy/stm32_hal_legacy.h
-safemrc\gpio.o: C:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stddef.h
-safemrc\gpio.o: C:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
+safemrc\gpio.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stddef.h
+safemrc\gpio.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
 safemrc\gpio.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_rcc_ex.h
 safemrc\gpio.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_gpio.h
 safemrc\gpio.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_gpio_ex.h

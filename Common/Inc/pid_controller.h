@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 
+#pragma pack(1)
 /* PID Controller structure definition */
 typedef struct PID_Controller
 {
@@ -23,6 +24,7 @@ typedef struct PID_Controller
     /* Status flag */
     bool is_initialized; // Initialization status
 } PID_Controller;
+#pragma pack()
 
 /**
  * @brief Initialize PID controller

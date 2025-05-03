@@ -1268,12 +1268,12 @@ ARM Macro Assembler    Page 20
               00000000 
 Command Line: --debug --xref --diag_suppress=9931 --cpu=Cortex-M7.fp.dp --apcs=
 interwork --depend=safemrc\startup_stm32h750xx.d -osafemrc\startup_stm32h750xx.
-o -I.\RTE\_safeMRC -I"C:\Program Files\Keil_v5\Arm\Packs\ARM\CMSIS\5.7.0\CMSIS\
-Core\Include" -I"C:\Program Files\Keil_v5\Arm\Packs\Keil\STM32H7xx_DFP\2.7.0\Dr
-ivers\CMSIS\Device\ST\STM32H7xx\Include" --predefine="__MICROLIB SETA 1" --pred
-efine="__UVISION_VERSION SETA 534" --predefine="_RTE_ SETA 1" --predefine="STM3
-2H750xx SETA 1" --predefine="_RTE_ SETA 1" --list=startup_stm32h750xx.lst start
-up_stm32h750xx.s
+o -IG:\lab\project\MRF_Bearing_Lock\embeded_code\safe-MRC\MDK-ARM\RTE -I"D:\Pro
+gram Files\Keil_v5\ARM\PACK\ARM\CMSIS\4.5.0\CMSIS\Include" -I"D:\Program Files\
+Keil_v5\ARM\PACK\Keil\STM32H7xx_DFP\3.1.1\Drivers\CMSIS\Device\ST\STM32H7xx\Inc
+lude" --predefine="__MICROLIB SETA 1" --predefine="__UVISION_VERSION SETA 518" 
+--predefine="_RTE_ SETA 1" --predefine="STM32H750xx SETA 1" --list=startup_stm3
+2h750xx.lst startup_stm32h750xx.s
 
 
 
