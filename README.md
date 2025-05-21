@@ -1,5 +1,11 @@
 # Embeded code for safeMRC used in pHRI
 
+## How to install the program
+
+```bash
+git clone https://gitee.com/li-wenbo-946/safe-mrc.git
+```
+
 ## Project Overview
 
 This project provides embedded software for the control of a Magnetorheological Clutch (MRC), specifically designed for applications in safe physical Human-Robot Interaction (pHRI). The system is implemented on STM32 microcontrollers and aims to ensure both high-performance actuation and safety in collaborative environments where humans and robots interact physically.
@@ -77,6 +83,12 @@ See the LICENSE file for details.
 
 ## 中文简介
 
+## 如何安装
+
+```bash
+git clone https://gitee.com/li-wenbo-946/safe-mrc.git
+```
+
 ### 项目概述
 
 本项目为磁流变离合器（MRC）的控制提供嵌入式软件，专为安全物理人机交互（pHRI）应用设计。系统基于STM32微控制器实现，旨在确保人机协作环境下的高性能驱动与安全保障。
@@ -150,8 +162,4 @@ MDK-ARM/      # Keil工程文件及启动代码
 
 详见LICENSE文件。
 
-## How to install the program
 
-```bash
-git clone https://gitee.com/li-wenbo-946/safe-mrc.git
-```
