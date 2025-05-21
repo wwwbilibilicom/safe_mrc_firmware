@@ -3,15 +3,20 @@
         {
             "name": "safeMRC",
             "includePath": [
-                "${workspaceFolder}/**",
-                "C:\\Program Files\\Keil_v5\\ARM\\ARMCC\\include",
-                "C:\\Program Files\\Keil_v5\\ARM\\ARMCC\\include\\rw",
-                "e:\\lab\\project\\MRF_Bearing_Lock\\embeded_code\\safe-MRC\\Core\\Inc",
-                "e:\\lab\\project\\MRF_Bearing_Lock\\embeded_code\\safe-MRC\\Drivers\\STM32H7xx_HAL_Driver\\Inc",
-                "e:\\lab\\project\\MRF_Bearing_Lock\\embeded_code\\safe-MRC\\Drivers\\STM32H7xx_HAL_Driver\\Inc\\Legacy",
-                "e:\\lab\\project\\MRF_Bearing_Lock\\embeded_code\\safe-MRC\\Drivers\\CMSIS\\Device\\ST\\STM32H7xx\\Include",
-                "e:\\lab\\project\\MRF_Bearing_Lock\\embeded_code\\safe-MRC\\Drivers\\CMSIS\\Include",
-                "e:\\lab\\project\\MRF_Bearing_Lock\\embeded_code\\safe-MRC\\Device\\Inc"
+                "g:\\lab\\project\\MRF_Bearing_Lock\\embeded_code\\safe-MRC\\Core\\Inc",
+                "g:\\lab\\project\\MRF_Bearing_Lock\\embeded_code\\safe-MRC\\Drivers\\STM32H7xx_HAL_Driver\\Inc",
+                "g:\\lab\\project\\MRF_Bearing_Lock\\embeded_code\\safe-MRC\\Drivers\\STM32H7xx_HAL_Driver\\Inc\\Legacy",
+                "g:\\lab\\project\\MRF_Bearing_Lock\\embeded_code\\safe-MRC\\Drivers\\CMSIS\\Device\\ST\\STM32H7xx\\Include",
+                "g:\\lab\\project\\MRF_Bearing_Lock\\embeded_code\\safe-MRC\\Drivers\\CMSIS\\Include",
+                "g:\\lab\\project\\MRF_Bearing_Lock\\embeded_code\\safe-MRC\\Device\\Inc",
+                "g:\\lab\\project\\MRF_Bearing_Lock\\embeded_code\\safe-MRC\\Common\\Inc",
+                "D:\\Program Files\\Keil_v5\\ARM\\ARMCC\\include",
+                "D:\\Program Files\\Keil_v5\\ARM\\ARMCC\\include\\rw",
+                "g:\\lab\\project\\MRF_Bearing_Lock\\embeded_code\\safe-MRC\\MDK-ARM",
+                "g:\\lab\\project\\MRF_Bearing_Lock\\embeded_code\\safe-MRC\\Device\\Src",
+                "g:\\lab\\project\\MRF_Bearing_Lock\\embeded_code\\safe-MRC\\Core\\Src",
+                "g:\\lab\\project\\MRF_Bearing_Lock\\embeded_code\\safe-MRC\\Drivers\\STM32H7xx_HAL_Driver\\Src",
+                "g:\\lab\\project\\MRF_Bearing_Lock\\embeded_code\\safe-MRC\\Common\\Src"
             ],
             "defines": [
                 "USE_HAL_DRIVER",
