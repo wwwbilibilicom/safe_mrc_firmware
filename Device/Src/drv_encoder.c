@@ -20,7 +20,8 @@ int drv_encoder_init(Device_encoder_t *Encoder_dev, TIM_HandleTypeDef *Encoder_t
     Encoder_dev->htim = Encoder_tim;
     Encoder_dev->Channel = Encoder_ch;
     HAL_TIM_IC_Start_IT(Encoder_dev->htim, Encoder_dev->Channel); // Start the timer interrupt for input capture
-    FirstOrder_KalmanFilter_Init(&(Encoder_dev->Encoder_KF), 0.001f, 0.133f);
+    FirstOrder_KalmanFilter_Init(&(Encoder_dev->Encoder_KF), 0.001f, 0.033f);
+    // moving_average_create(&(Encoder_dev->movingAverage), 100, 1);
     BandPassFilter_Init(30.0f, 150.0f, 1000.0f, &(Encoder_dev->bandPassFilter));
     Encoder_dev->Encoder_Duty.CapIndex = First_Rrising;
     Encoder_dev->Encoder_Duty.CapFlag = 0;
@@ -40,16 +41,14 @@ int drv_encoder_init(Device_encoder_t *Encoder_dev, TIM_HandleTypeDef *Encoder_t
  */
 void CaptureDutyCycle(Device_encoder_t *Encoder_dev)
 {
-#ifdef FREERTOS
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-#endif
     switch (Encoder_dev->Encoder_Duty.CapIndex)
     {
     case First_Rrising:
         Encoder_dev->Encoder_Duty.CapFlag = 0;
-        Encoder_dev->Encoder_Duty.CapVal[0] = HAL_TIM_ReadCapturedValue(Encoder_dev->htim, Encoder_dev->Channel);
+        // Encoder_dev->Encoder_Duty.CapVal[0] = HAL_TIM_ReadCapturedValue(Encoder_dev->htim, Encoder_dev->Channel);
         // printf("Capture CapVal0 is :%d\n",Encoder_dev->Encoder_Duty.CapVal[0]);
         Encoder_dev->Encoder_Duty.CapIndex = Falling;
+        __HAL_TIM_SET_COUNTER(Encoder_dev->htim, 0); // 计数清零，从头开始计
         __HAL_TIM_SET_CAPTUREPOLARITY(Encoder_dev->htim, Encoder_dev->Channel, TIM_INPUTCHANNELPOLARITY_FALLING);
         break;
 
@@ -66,13 +65,7 @@ void CaptureDutyCycle(Device_encoder_t *Encoder_dev)
         HAL_TIM_IC_Stop_IT(Encoder_dev->htim, Encoder_dev->Channel);
         Encoder_dev->Encoder_Duty.CapIndex = First_Rrising;
         Encoder_dev->Encoder_Duty.CapFlag = 1;
-#ifdef FREERTOS
-        xSemaphoreGiveFromISR(Encoder_dev->Encoder_Duty.xEncoderGetPosSemap, &xHigherPriorityTaskWoken);
-        if (xHigherPriorityTaskWoken == pdTRUE)
-        {
-            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-        }
-#endif
+        __HAL_TIM_SET_COUNTER(Encoder_dev->htim, 0); // 计数清零，从头开始计
         break;
 
     default:
@@ -80,62 +73,6 @@ void CaptureDutyCycle(Device_encoder_t *Encoder_dev)
         break;
     }
 }
-
-/**
- * @brief Get the position information of the Encoder module.
- *
- * This function determines the position of the Encoder module by calculating its duty cycle. The duty cycle is calculated by measuring the high time of the pulse and its period.
- * If the CapFlag flag is set, indicating that new position data is available, the function will update the duty cycle calculation and start a timer to obtain the next position update.
- *
- * @return The position of the Encoder module in degrees.
- */
-__attribute__((weak)) float Encoder_GetPos(Device_encoder_t *Encoder_dev)
-{
-    /* Check if new position data is available */
-
-    if (Encoder_dev->Encoder_Duty.CapFlag)
-    {
-        /* Clear the new data flag */
-        Encoder_dev->Encoder_Duty.CapFlag = 0;
-
-        /* Calculate the period */
-
-        if (Encoder_dev->Encoder_Duty.CapVal[2] > Encoder_dev->Encoder_Duty.CapVal[0])
-        {
-            Encoder_dev->Encoder_Duty.Period = Encoder_dev->Encoder_Duty.CapVal[2] - Encoder_dev->Encoder_Duty.CapVal[0];
-        }
-        else
-        {
-            Encoder_dev->Encoder_Duty.Period = Encoder_dev->Encoder_Duty.CapVal[2] + 0xffff + 1 - Encoder_dev->Encoder_Duty.CapVal[0];
-        }
-
-        /* Calculate the high time of the pulse */
-        if (Encoder_dev->Encoder_Duty.CapVal[1] >= Encoder_dev->Encoder_Duty.CapVal[0])
-        {
-            Encoder_dev->Encoder_Duty.HighTime = Encoder_dev->Encoder_Duty.CapVal[1] - Encoder_dev->Encoder_Duty.CapVal[0];
-        }
-        else
-        {
-            Encoder_dev->Encoder_Duty.HighTime = 0xFFFF + 1 - Encoder_dev->Encoder_Duty.CapVal[0] + Encoder_dev->Encoder_Duty.CapVal[1];
-        }
-
-        /* Calculate the duty cycle */
-
-        Encoder_dev->Encoder_Duty.Duty = (float)Encoder_dev->Encoder_Duty.HighTime / (float)Encoder_dev->Encoder_Duty.Period;
-        Encoder_dev->raw_angle = (float)(Encoder_dev->Encoder_Duty.Duty * 360.0f);
-        Encoder_dev->filtered_angle = FirstOrder_KalmanFilter_Update(&Encoder_dev->Encoder_KF, Encoder_dev->raw_angle);
-        /* Start a timer to capture the next position update */
-        // HAL_TIM_IC_Start_IT(Encoder_dev->htim, Encoder_dev->Channel);
-        /* Return the position information in degrees */
-
-        // return Encoder_dev->filtered_angle;
-        return Encoder_dev->raw_angle;
-    }
-
-    // return Encoder_dev->filtered_angle;
-    return Encoder_dev->raw_angle;
-}
-
 
 
 /**
@@ -146,33 +83,40 @@ __attribute__((weak)) float Encoder_GetPos(Device_encoder_t *Encoder_dev)
  */
 void Encoder_Calibrate_n_Filter(Device_encoder_t *Encoder_dev)
 {
-    /* Calculate the period */
+    uint32_t period, high_time;
 
-    if (Encoder_dev->Encoder_Duty.CapVal[2] > Encoder_dev->Encoder_Duty.CapVal[0])
+    period = Encoder_dev->Encoder_Duty.CapVal[2];
+    high_time = Encoder_dev->Encoder_Duty.CapVal[1];
+    // printf("period: %d, high_time: %d\n", period, high_time);
+
+    
+    /* Store the values */
+    Encoder_dev->Encoder_Duty.Period = period;
+    Encoder_dev->Encoder_Duty.HighTime = high_time;
+    
+    /* Calculate duty cycle with safety checks */
+    if (period > 0)
     {
-        Encoder_dev->Encoder_Duty.Period = Encoder_dev->Encoder_Duty.CapVal[2] - Encoder_dev->Encoder_Duty.CapVal[0];
+        float duty = (float)high_time / (float)period;
+        /* Limit duty cycle to valid range */
+        if (duty > 1.0f) duty = 1.0f;
+        if (duty < 0.0f) duty = 0.0f;
+        Encoder_dev->Encoder_Duty.Duty = duty;
     }
     else
     {
-        Encoder_dev->Encoder_Duty.Period = Encoder_dev->Encoder_Duty.CapVal[2] + 0xffff + 1 - Encoder_dev->Encoder_Duty.CapVal[0];
+        /* Handle invalid period */
+        Encoder_dev->Encoder_Duty.Duty = 0.0f;
     }
-
-    /* Calculate the high time of the pulse */
-    if (Encoder_dev->Encoder_Duty.CapVal[1] >= Encoder_dev->Encoder_Duty.CapVal[0])
-    {
-        Encoder_dev->Encoder_Duty.HighTime = Encoder_dev->Encoder_Duty.CapVal[1] - Encoder_dev->Encoder_Duty.CapVal[0];
-    }
-    else
-    {
-        Encoder_dev->Encoder_Duty.HighTime = 0xFFFF + 1 - Encoder_dev->Encoder_Duty.CapVal[0] + Encoder_dev->Encoder_Duty.CapVal[1];
-    }
-
-    /* Calculate the duty cycle */
-
-    Encoder_dev->Encoder_Duty.Duty = (float)Encoder_dev->Encoder_Duty.HighTime / (float)Encoder_dev->Encoder_Duty.Period;
-    Encoder_dev->raw_angle = (float)(Encoder_dev->Encoder_Duty.Duty * 360.0f);
+    
+    /* Calculate angle */
+    Encoder_dev->raw_angle = Encoder_dev->Encoder_Duty.Duty * 360.0f;
+    
+    /* Apply Kalman filter */
     Encoder_dev->filtered_angle = FirstOrder_KalmanFilter_Update(&Encoder_dev->Encoder_KF, Encoder_dev->raw_angle);
-
+    // Encoder_dev->filtered_angle = moving_average_filter(&Encoder_dev->movingAverage, Encoder_dev->raw_angle);
+    
+    /* Restart capture */
     HAL_TIM_IC_Start_IT(Encoder_dev->htim, Encoder_dev->Channel);
 }
 

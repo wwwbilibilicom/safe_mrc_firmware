@@ -41,7 +41,7 @@ void moving_average_create(movingAverage_t *context,
  * @param context Pointer to the moving average filter context structure. The context structure contains configuration and state information for the filter.
  * @param filter_input The value that needs to be filtered.
  */
-void moving_average_filter(movingAverage_t *context,
+float moving_average_filter(movingAverage_t *context,
                            float filter_input)
 {
     // Update the filter state instead of checking if the sampling time has elapsed.
@@ -77,6 +77,7 @@ void moving_average_filter(movingAverage_t *context,
     // Calculate the moving average and update the filtered output.
     context->filtered = (float)(context->sum / context->fill);
     // }
+    return context->filtered;
 }
 
 void FirstOrder_KalmanFilter_Init(FirstOrderKalmanFilter *KalmanFilter, float Q, float R)

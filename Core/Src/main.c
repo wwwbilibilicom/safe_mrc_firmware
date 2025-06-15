@@ -125,6 +125,13 @@ int main(void)
     {
       MRC.control_loop_flag = 0;
       VNH7070_Multisense_ADC_process(&MRC.VNH7040);
+      
+      printf("AnglarVelocity, Encoder postion(deg) and filtered_angle(deg) with period and high_time: %.3f, %.3f, %.3f, %d, %d\n", MRC.Encoder.AngularVelocity, MRC.Encoder.raw_angle, MRC.Encoder.filtered_angle, MRC.Encoder.Encoder_Duty.Period, MRC.Encoder.Encoder_Duty.HighTime);
+      if(MRC.Encoder.Encoder_Duty.CapFlag == 1)
+      {
+        Encoder_Calibrate_n_Filter(&MRC.Encoder);
+        CalAngularVelocity(&MRC.Encoder);
+      }
     }
   }
   /* USER CODE END 3 */

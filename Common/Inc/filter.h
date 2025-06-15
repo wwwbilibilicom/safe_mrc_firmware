@@ -41,7 +41,7 @@ extern "C"
      * @param context [in] instance of filter object
      * @param input [in] data sample to filter
      */
-    void moving_average_filter(movingAverage_t *context, float input);
+    float moving_average_filter(movingAverage_t *context, float input);
 
 
 #pragma pack(1)

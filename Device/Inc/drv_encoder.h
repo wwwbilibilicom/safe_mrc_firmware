@@ -47,6 +47,7 @@ extern "C"
 
         PWM_DUTY_Capture Encoder_Duty;
         FirstOrderKalmanFilter Encoder_KF;
+        movingAverage_t movingAverage;
         float raw_angle;
         float filtered_angle;
         float initial_angle;
