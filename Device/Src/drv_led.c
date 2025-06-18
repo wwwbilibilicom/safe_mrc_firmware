@@ -55,11 +55,11 @@ void led_on(device_led_t * led_dev)
 }
 
 /**
- * @brief Toggle the state of the LED device.
+ * @brief Turn off the LED device.
  *
- * This function toggles the state of the LED device by inverting the GPIO pin state.
+ * This function turns off the LED device by setting the GPIO pin state based on the open level.
  *
- * @param led_dev Pointer to the LED device structure to be toggled.
+ * @param led_dev Pointer to the LED device structure to be turned off.
  */
 void led_off(device_led_t * led_dev)
 {
@@ -73,6 +73,13 @@ void led_off(device_led_t * led_dev)
     }
 }
 
+/**
+ * @brief Toggle the state of the LED device.
+ *
+ * This function toggles the state of the LED device by inverting the GPIO pin state.
+ *
+ * @param led_dev Pointer to the LED device structure to be toggled.
+ */
 void led_toggle(device_led_t * led_dev)
 {
     HAL_GPIO_TogglePin(led_dev->GPIO_Port, led_dev->GPIO_Pin);

@@ -1,165 +1,239 @@
-# Embeded code for safeMRC used in pHRI
+# Safe MRC - STM32H7 Magnetorheological Clutch Controller
 
-## How to install the program
+## Overview
 
-```bash
-git clone https://gitee.com/li-wenbo-946/safe-mrc.git
-```
+Safe MRC is an embedded control system for Magnetorheological Clutch (MRC) devices using STM32H7 microcontrollers. The system provides precise torque control, collision detection, and real-time communication capabilities.
 
-## Project Overview
+## Features
 
-This project provides embedded software for the control of a Magnetorheological Clutch (MRC), specifically designed for applications in safe physical Human-Robot Interaction (pHRI). The system is implemented on STM32 microcontrollers and aims to ensure both high-performance actuation and safety in collaborative environments where humans and robots interact physically.
+- **Precise Torque Control**: PID-based control system for accurate torque regulation
+- **Collision Detection**: Real-time collision detection and safety response
+- **DMA Communication**: High-efficiency UART communication using DMA
+- **Request-Response Protocol**: Master-slave communication pattern to avoid bus conflicts
+- **Multi-sensor Support**: Encoder feedback, voltage monitoring, and temperature sensing
+- **Safety Features**: Automatic demagnetization on collision detection
+- **Modular Design**: Clean separation of hardware drivers and application logic
 
-### Key Features
-
-- **Magnetorheological Clutch Control:** Implements precise control algorithms for the MRC, enabling real-time adjustment of torque and engagement/disengagement states.
-- **Safety Mechanisms:** Includes collision detection and automatic response logic to ensure user safety during physical interaction.
-- **Modular Design:** The codebase is organized into modules for device drivers, communication, control algorithms (including PID), and hardware abstraction.
-- **Real-Time Communication:** Supports UART-based communication for command and feedback exchange, suitable for integration with higher-level robotic systems.
-- **Extensibility:** Designed for easy adaptation to different hardware configurations and research needs in pHRI.
-
-### Application Scenario
-
-The software is intended for use in research and development of safe human-robot collaboration, such as assistive robotics, rehabilitation devices, and collaborative industrial robots. By leveraging the unique properties of magnetorheological clutches, the system can provide both strong actuation and rapid disengagement for safety.
-
----
-
-## Code Structure
+## Project Structure
 
 ```
-Core/         # Main application logic (main.c, initialization, main loop)
-Device/       # Device drivers (MRC, encoder, keys, LEDs, H-bridge, etc.)
-Common/       # Common utilities (PID controller, filters)
-Drivers/      # STM32 HAL and CMSIS drivers
-MDK-ARM/      # Keil project files and startup code
+safe-MRC/
+├── Common/           # Common utilities (filters, PID controllers)
+├── Core/            # STM32H7 core files and main application
+├── Device/          # Device drivers and communication modules
+│   ├── Inc/         # Header files
+│   └── Src/         # Source files
+├── Drivers/         # STM32H7 HAL drivers
+└── MDK-ARM/         # Keil MDK-ARM project files
 ```
 
-- **Core/**: Contains the main entry point and system initialization.
-- **Device/**: Implements hardware abstraction for the MRC and peripherals.
-- **Common/**: Provides reusable modules like PID and filters.
-- **Drivers/**: Vendor-provided MCU drivers.
-- **MDK-ARM/**: Project files for building and debugging with Keil.
+## Key Components
 
-## Main Logic Flow
+### MRC Communication Module (`mrc_com.c/h`)
 
-1. System and peripherals are initialized (GPIO, ADC, TIM, UART, etc.).
-2. The MRC device is initialized, including communication and control modules.
-3. The main loop handles:
-   - Communication with host/controller via UART
-   - Key input processing
-   - Control loop for MRC (torque, state, safety)
-   - Collision detection and safety response
-4. Real-time feedback and command exchange with upper-level systems.
+The MRC communication module provides DMA-based UART communication with request-response pattern:
 
-## Deployment
+- **DMA Idle Reception**: Automatic command reception using UART IDLE interrupt
+- **CRC Validation**: CCITT CRC-16 checksum verification
+- **Request-Response**: Device only responds after receiving a command
+- **Bus Conflict Prevention**: Master-slave pattern ensures no bus conflicts
+- **Error Handling**: Robust error detection and recovery
 
-### Requirements
+#### Communication Flow
 
-- STM32H7 series microcontroller
-- Keil MDK-ARM or compatible toolchain
-- ST-Link or compatible programmer/debugger
+1. **DMA Idle Reception**: Device continuously receives data via DMA
+2. **IDLE Interrupt**: When UART becomes idle, interrupt sets RxFlag=1
+3. **Command Unpacking**: Main loop detects RxFlag and unpacks command
+4. **Parameter Update**: Device updates mode and target torque from command
+5. **Feedback Preparation**: Device packs current status (encoder, torque, collision)
+6. **Response Transmission**: Device sends feedback via DMA
+7. **Reception Restart**: DMA reception restarted for next command
 
-### Build & Flash
+#### Usage Example
 
-1. Open `MDK-ARM/safeMRC.uvprojx` in Keil MDK.
-2. Build the project (default target: STM32H750xx).
-3. Connect the STM32 board via ST-Link.
-4. Flash the firmware to the board.
+```c
+// Initialize MRC device with communication
+Device_MRC_t mrc_device;
+MRC_Init("MRC_Device", &mrc_device, 0x01);
 
-### Run
+// Main loop - handle communication
+while(1) {
+    // Process communication exchange (request-response)
+    MRC_Com_Process(&mrc_device);
+    
+    // Handle key events
+    MRC_Key1_Reaction(&mrc_device);
+    MRC_Key2_Reaction(&mrc_device);
+    
+    // Update control loop
+    MRC_set_voltage(&mrc_device);
+}
+```
 
-- After flashing, the device will start running automatically.
-- Use UART to communicate with the device for command and feedback.
+### Communication Protocol
 
-## Contributing
+The system uses a binary protocol with request-response pattern:
 
-Pull requests and issues are welcome. Please follow standard C code style and document your changes.
+#### Command Message (8 bytes) - Host → Device
+```
+[0-1] Header: 0xFE 0xEE
+[2]   Device ID
+[3]   Mode
+[4-5] Target Torque (16-bit)
+[6-7] CRC-16
+```
+
+#### Feedback Message (13 bytes) - Device → Host
+```
+[0-1] Header: 0xFE 0xEE
+[2]   Device ID
+[3]   Mode
+[4-7] Encoder Value (32-bit)
+[8-9] Present Torque (16-bit)
+[10]  Collision Flag
+[11-12] CRC-16
+```
+
+### Hardware Drivers
+
+- **VNH7040 Driver**: Motor driver chip control with PWM and ADC
+- **Encoder Driver**: Position and velocity feedback
+- **LED/Key Driver**: User interface control
+- **PID Controller**: Closed-loop control implementation
+
+## Building and Flashing
+
+### Prerequisites
+
+- Keil MDK-ARM v5.37 or later
+- STM32H7xx HAL drivers
+- STM32CubeMX (for configuration)
+
+### Build Steps
+
+1. Open `MDK-ARM/safeMRC.uvprojx` in Keil MDK-ARM
+2. Configure target settings if needed
+3. Build the project (F7)
+4. Flash to STM32H7 device
+
+### Configuration
+
+The system can be configured through the following defines:
+
+```c
+#define MRC_COIL_MAX_VOLTAGE 12.0f    // Maximum coil voltage
+#define PWM_FREQ 20000                // PWM frequency
+#define ENCODER_RESOLUTION 4096       // Encoder pulses per revolution
+```
+
+## API Reference
+
+### MRC Device Functions
+
+#### `MRC_Init(dev_name, mrc, id)`
+Initialize MRC device with communication support.
+
+**Parameters:**
+- `dev_name`: Device name string
+- `mrc`: MRC device structure pointer
+- `id`: Device ID (0-255)
+
+#### `MRC_set_voltage(mrc)`
+Set coil voltage based on target torque.
+
+**Parameters:**
+- `mrc`: MRC device structure pointer
+
+#### `MRC_Com_Process(mrc)`
+Handle communication exchange using request-response pattern.
+
+**Parameters:**
+- `mrc`: MRC device structure pointer
+
+#### `MRC_collision_detect(mrc1, mrc2, param, threshold)`
+Detect collision between two MRC devices.
+
+**Parameters:**
+- `mrc1`, `mrc2`: MRC device structure pointers
+- `param`: Detection parameter
+- `threshold`: Collision threshold
+
+### Communication Functions
+
+#### `MRC_Com_Init(mrc_com, huart, id)`
+Initialize communication module with DMA idle reception support.
+
+#### `MRC_Com_UnpackCmd(mrc_com)`
+Unpack and validate command from DMA buffer (device side).
+
+#### `MRC_Com_PackFbk(mrc_com, mode, encoder, torque, collision)`
+Pack feedback message with current device status (device side).
+
+#### `MRC_Com_SendFbk(mrc_com)`
+Send feedback response using DMA (device side).
+
+#### `MRC_Com_RestartReception(mrc_com)`
+Restart DMA reception for next command (device side).
+
+#### `MRC_Com_PackCmd(mrc_com, mode, torque)` (Host side)
+Pack command message for transmission.
+
+## Safety Features
+
+1. **Automatic Demagnetization**: On collision detection, coils are automatically demagnetized
+2. **Voltage Limiting**: Coil voltage is limited to safe operating range
+3. **CRC Validation**: All communication messages are validated using CRC-16
+4. **Timeout Protection**: DMA operations include timeout protection
+5. **Error Recovery**: Automatic recovery from communication errors
+6. **Bus Conflict Prevention**: Request-response pattern prevents multiple devices from transmitting simultaneously
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Communication Not Working**
+   - Check UART configuration in STM32CubeMX
+   - Verify DMA settings for USART2
+   - Ensure IDLE interrupt is enabled
+   - Confirm request-response timing
+
+2. **CRC Errors**
+   - Verify protocol implementation on host side
+   - Check byte order and data types
+   - Ensure consistent CRC calculation
+
+3. **DMA Issues**
+   - Verify DMA stream configuration
+   - Check interrupt priorities
+   - Ensure proper buffer alignment
+
+4. **Bus Conflicts**
+   - Ensure only one device responds at a time
+   - Check device ID configuration
+   - Verify request-response timing
+
+### Debug Output
+
+The system provides debug output through UART1:
+- Device initialization status
+- Communication errors
+- Collision detection events
+- Voltage changes
 
 ## License
 
-See the LICENSE file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
----
+## Contributing
 
-## 中文简介
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
 
-## 如何安装
+## Support
 
-```bash
-git clone https://gitee.com/li-wenbo-946/safe-mrc.git
-```
-
-### 项目概述
-
-本项目为磁流变离合器（MRC）的控制提供嵌入式软件，专为安全物理人机交互（pHRI）应用设计。系统基于STM32微控制器实现，旨在确保人机协作环境下的高性能驱动与安全保障。
-
-### 主要特性
-
-- **磁流变离合器控制：** 实现了对MRC的精确控制算法，支持实时扭矩调节及离合器的吸合/断开。
-- **安全机制：** 集成了碰撞检测与自动响应逻辑，保障物理交互过程中的用户安全。
-- **模块化设计：** 代码结构清晰，分为设备驱动、通信、控制算法（含PID）及硬件抽象等模块。
-- **实时通信：** 支持基于UART的命令与反馈通信，便于与上位机或机器人系统集成。
-- **易于扩展：** 便于适配不同硬件配置，满足pHRI领域的科研与开发需求。
-
-### 应用场景
-
-本软件适用于安全人机协作的科研与开发，如助力机器人、康复设备及协作工业机器人。通过磁流变离合器的独特特性，系统可在提供强力驱动的同时，实现快速断开以保障安全。
-
----
-
-## 代码结构
-
-```
-Core/         # 主应用逻辑（main.c，初始化，主循环）
-Device/       # 设备驱动（MRC、编码器、按键、LED、H桥等）
-Common/       # 通用工具模块（PID控制器、滤波器）
-Drivers/      # STM32官方驱动
-MDK-ARM/      # Keil工程文件及启动代码
-```
-
-- **Core/**：主入口和系统初始化
-- **Device/**：MRC及外设的硬件抽象实现
-- **Common/**：可复用模块如PID和滤波器
-- **Drivers/**：芯片厂商提供的驱动
-- **MDK-ARM/**：Keil开发环境的工程文件
-
-## 主要逻辑流程
-
-1. 初始化系统和外设（GPIO、ADC、定时器、串口等）
-2. 初始化MRC设备，包括通信和控制模块
-3. 主循环处理：
-   - 通过UART与主控/上位机通信
-   - 按键输入处理
-   - MRC控制回路（扭矩、状态、安全）
-   - 碰撞检测与安全响应
-4. 与上位系统进行实时命令与反馈交互
-
-## 部署说明
-
-### 环境要求
-
-- STM32H7系列微控制器
-- Keil MDK-ARM或兼容工具链
-- ST-Link或兼容下载器
-
-### 编译与烧录
-
-1. 用Keil MDK打开 `MDK-ARM/safeMRC.uvprojx`
-2. 编译工程（默认目标：STM32H750xx）
-3. 用ST-Link连接开发板
-4. 烧录固件到开发板
-
-### 运行
-
-- 烧录后设备自动运行
-- 通过UART与设备进行命令和反馈通信
-
-## 贡献
-
-欢迎提交PR和Issue。请遵循C语言代码风格并注释你的更改。
-
-## 许可证
-
-详见LICENSE文件。
+For technical support or questions, please open an issue on the project repository.
 
 

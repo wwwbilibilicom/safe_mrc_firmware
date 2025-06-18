@@ -35,17 +35,29 @@ uint16_t const crc_ccitt_table[256] = {
 	0xf78f, 0xe606, 0xd49d, 0xc514, 0xb1ab, 0xa022, 0x92b9, 0x8330,
 	0x7bc7, 0x6a4e, 0x58d5, 0x495c, 0x3de3, 0x2c6a, 0x1ef1, 0x0f78};
 
+/**
+ * @brief Calculate CRC-CCITT value for single byte
+ * @param crc Current CRC value
+ * @param c Byte to process
+ * @return Updated CRC value
+ * 
+ * @note This is an internal function for byte-by-byte CRC calculation
+ */
 static uint16_t crc_ccitt_byte(uint16_t crc, const uint8_t c)
 {
 	return (crc >> 8) ^ crc_ccitt_table[(crc ^ c) & 0xff];
 }
 
 /**
- *	crc_ccitt - recompute the CRC (CRC-CCITT variant) for the data
- *	buffer
- *	@crc: previous CRC value
- *	@buffer: data pointer
- *	@len: number of bytes in the buffer
+ * @brief Calculate CRC-CCITT checksum
+ * @param crc Initial CRC value, typically use 0xFFFF
+ * @param buffer Pointer to data buffer to calculate CRC
+ * @param len Data length (number of bytes)
+ * @return Calculated CRC-CCITT checksum
+ * 
+ * @note This is a CRC-CCITT variant implementation with polynomial x^16 + x^12 + x^5 + 1
+ * @note Suitable for data integrity verification, such as error detection in communication protocols
+ * @note Uses lookup table method for improved calculation efficiency
  */
 uint16_t crc_ccitt(uint16_t crc, uint8_t const *buffer, uint8_t len)
 {

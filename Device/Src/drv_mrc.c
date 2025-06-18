@@ -10,7 +10,6 @@
 
 extern DMA_HandleTypeDef hdma_usart2_rx;
 
-
 #define MRC_COIL_MAX_VOLTAGE 12.0f //remeber to change the same value in drv_vnh7040.c
 #define H_Encoder htim1 // Encoder timer handle for capture the pwm signal
 #define Encoder_CH TIM_CHANNEL_4 // timer channel for encoder
@@ -34,17 +33,13 @@ extern DMA_HandleTypeDef hdma_usart2_rx;
  */
 void MRC_Init(const uint8_t *dev_name, Device_MRC_t *MRC, uint8_t id)
 {
-
     MRC->device_name = dev_name;
-    MRC->com.id = id; // ID of the device
-    MRC->com.mrc_huart = &huart2; // UART handle for communication
-
-    MRC->com.RxLen = sizeof(MRC->com.cmd_msg_buffer); // Length of the received command message buffer
-    MRC->com.TxLen = sizeof(MRC->com.cmd_msg_buffer); // Length of the transmitted command message buffer
-    MRC->com.RxFlag = 0; // Flag to indicate if data has been received
-
-    __HAL_UART_ENABLE_IT(MRC->com.mrc_huart, UART_IT_IDLE); // Enable IDLE interrupt for UART communication
-    HAL_UART_Receive_DMA(MRC->com.mrc_huart, MRC->com.cmd_msg_buffer, MRC->com.RxLen); // Start DMA reception
+    
+    // Initialize MRC communication module
+    if (MRC_Com_Init(&MRC->com, &huart2, id) != 0) {
+        printf("MRC communication initialization failed!\n");
+        return;
+    }
 
     drv_led_init(&MRC->LED1, "LED1", LED1_GPIO_Port, LED1_Pin, HIGH_LEVEL); // LED1 GPIO
     drv_led_init(&MRC->LED2, "LED2", LED2_GPIO_Port, LED2_Pin, HIGH_LEVEL); // LED2 GPIO
@@ -66,7 +61,6 @@ void MRC_Init(const uint8_t *dev_name, Device_MRC_t *MRC, uint8_t id)
     led_on(&MRC->LED2); // Turn on LED1
     printf("device MRC(%s) init success!\n", dev_name);
 }
-
 
 /**
  * @brief Set the des_voltage of the MRC device.
@@ -120,88 +114,76 @@ void MRC_set_voltage(Device_MRC_t *MRC)
 void MRC_collision_detect(Device_MRC_t *MRC1, Device_MRC_t *MRC2, float param, float threshold)
 {
     float index = fabsf(param);
-    if(!(MRC1->COLLISION_REACT_FLAG && MRC2->COLLISION_REACT_FLAG))          // 未碰撞状态
+    if(!(MRC1->COLLISION_REACT_FLAG && MRC2->COLLISION_REACT_FLAG))          // Non-collision state
     {
-        if(index < threshold)                   // 未超出阈值，无碰撞
+        if(index < threshold)                   // Below threshold, no collision
         {
             return;
         }
-        else                                    // 发生碰撞，解锁MRC
+        else                                    // Collision occurred, unlock MRC
         {
             // MRC_unlock(MRC1);
             // MRC_unlock(MRC2);
             MRC1->COLLISION_REACT_FLAG = 1;
             MRC2->COLLISION_REACT_FLAG = 1;
-            HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_RESET);   // MRC断电去磁，指示灯灭
+            HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_RESET);   // MRC power off demagnetization, indicator light off
             printf("Collision detected!\n");
             return;
         }
     }
-    else if(MRC1->COLLISION_REACT_FLAG && MRC2->COLLISION_REACT_FLAG)     // 碰撞状态
+    else if(MRC1->COLLISION_REACT_FLAG && MRC2->COLLISION_REACT_FLAG)     // Collision state
     {
-        if(index >= threshold)                  // 超出阈值，碰撞未结束
+        if(index >= threshold)                  // Above threshold, collision not ended
         {
             return;
         }
-        else                                    // 判定碰撞结束，重锁MRC
+        else                                    // Collision ended, relock MRC
         {
             // MRC_lock(MRC1);
             // MRC_lock(MRC2);
             MRC1->COLLISION_REACT_FLAG = 0;
             MRC2->COLLISION_REACT_FLAG = 0;
-            HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_SET);    // MRC上电上磁，指示灯亮
+            HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_SET);    // MRC power on magnetization, indicator light on
             printf("Collision ended!\n");
             return;
         }
     }
 }
 
-int MRC_Cmd_Msg_Extract(Device_MRC_t *device)
+/**
+ * @brief MRC communication process using new mrc_com module
+ * @param MRC MRC device structure pointer
+ * 
+ * @note Handle communication with host computer using DMA idle reception mode
+ * @note Extract command and send feedback automatically
+ */
+void MRC_Com_Process(Device_MRC_t *MRC)
 {
-    if (device->com.cmd_msg.CRC16Data == crc_ccitt(0x0000, (uint8_t *)&device->com.cmd_msg, 46))
-    {
-        if(device->com.cmd_msg.head[0] == 0xFE && device->com.cmd_msg.head[1] == 0xEE) // 0xFE 0xEE
-        {
-            if(device->com.cmd_msg.id == device->com.id) // ID匹配
-            {
-                device->mode = device->com.cmd_msg.mode;
-                device->des_torque = ((float)device->com.cmd_msg.des_torque)/100.0f;
-
-                device->com.cmd_correct = 1;
-                return device->com.cmd_correct;
+    // Check if new command received (RxFlag set by UART IDLE interrupt)
+    if (MRC->com.RxFlag == 1) {
+        // Unpack and validate command message from DMA buffer
+        if (MRC_Com_UnpackCmd(&MRC->com) == 0) {
+            // Update device parameters from received command
+            MRC->mode = MRC->com.cmd_msg.mode;
+            MRC->des_torque = ((float)MRC->com.cmd_msg.des_torque) / 100.0f;
+            
+            // Prepare feedback data
+            uint32_t encoder_value = (uint32_t)(MRC->Encoder.filtered_angle * 1000);
+            uint16_t present_torque = (uint16_t)(MRC->VNH7040.actual_voltage * 1000); // Use actual voltage as torque indicator
+            uint8_t collision_flag = MRC->COLLISION_REACT_FLAG; // Use correct collision flag
+            
+            // Pack feedback message with current device status
+            if (MRC_Com_PackFbk(&MRC->com, MRC->mode, encoder_value, present_torque, collision_flag) == 0) {
+                // Send feedback response
+                MRC_Com_SendFbk(&MRC->com);
             }
         }
+        
+        // Reset RxFlag after processing
+        MRC->com.RxFlag = 0;
+        
     }
-    device->com.cmd_correct = 0;
-    return device->com.cmd_correct;
 }
-
-void MRC_Fbk_Msg_Modify(Device_MRC_t *device)
-{
-    device->com.fbk_msg.head[0] = 0xFE; // 0xEE 0xFE
-    device->com.fbk_msg.head[1] = 0xEE; // 0xFE 0xEE
-    device->com.fbk_msg.id = device->com.id; // ID匹配
-    device->com.fbk_msg.mode = device->mode;
-    device->com.fbk_msg.encoder_value = (uint32_t)(device->Encoder.filtered_angle * 1000); // 角度值
-
-    device->com.fbk_msg.present_torque = (uint16_t)(device->des_torque * 1000); // 设定扭矩值
-    device->com.fbk_msg.CRC16Data = (uint16_t)crc_ccitt(0x0000, (uint8_t *)&device->com.fbk_msg, sizeof(device->com.fbk_msg) - 2); // CRC16校验
-}
-
-void MRC_Com_Exchange(Device_MRC_t *MRC)
-{
-  if (MRC->com.RxFlag == 1)
-  {
-    MRC->com.RxFlag = 0;
-    memcpy(&MRC->com.cmd_msg, MRC->com.cmd_msg_buffer, MRC->com.RxLen);
-    MRC_Cmd_Msg_Extract(MRC);
-    MRC_Fbk_Msg_Modify(MRC);
-    HAL_UART_Transmit_DMA(MRC->com.mrc_huart, (uint8_t *)&MRC->com.fbk_msg, MRC->com.TxLen);
-    memset(MRC->com.cmd_msg_buffer, 0, MRC->com.RxLen);
-    HAL_UART_Receive_DMA(MRC->com.mrc_huart, (uint8_t *)MRC->com.cmd_msg_buffer, MRC->com.RxLen);
-  }
-}
-
 
 /**
  * @brief Handle the reaction to the KEY1 press event.
@@ -231,7 +213,6 @@ void MRC_Key1_Reaction(Device_MRC_t *MRC)
         }
     }
 }
-
 
 /**
  * @brief Handle the reaction to the KEY2 press event.

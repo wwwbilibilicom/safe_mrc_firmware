@@ -29,6 +29,7 @@
 /* USER CODE BEGIN Includes */
 #include "drv_mrc.h"
 #include "stdio.h"
+#include "string.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -119,7 +120,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    MRC_Com_Exchange(&MRC);
+    MRC_Com_Process(&MRC);
     MRC_Key1_Reaction(&MRC);
     MRC_Key2_Reaction(&MRC);
     if(MRC.control_loop_flag == 1)
@@ -127,7 +128,7 @@ int main(void)
       MRC.control_loop_flag = 0;
       VNH7070_Multisense_ADC_process(&MRC.VNH7040);
       
-      printf("AnglarVelocity, Encoder postion(deg) and filtered_angle(deg) with period and high_time: %.3f, %.3f, %.3f, %d, %d\n", MRC.Encoder.AngularVelocity, MRC.Encoder.raw_angle, MRC.Encoder.filtered_angle, MRC.Encoder.Encoder_Duty.Period, MRC.Encoder.Encoder_Duty.HighTime);
+      // printf("AnglarVelocity, Encoder postion(deg) and filtered_angle(deg) with period and high_time: %.3f, %.3f, %.3f, %d, %d\n", MRC.Encoder.AngularVelocity, MRC.Encoder.raw_angle, MRC.Encoder.filtered_angle, MRC.Encoder.Encoder_Duty.Period, MRC.Encoder.Encoder_Duty.HighTime);
       if(MRC.Encoder.Encoder_Duty.CapFlag == 1)
       {
         Encoder_Calibrate_n_Filter(&MRC.Encoder);
@@ -213,6 +214,15 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 	}
 }
 
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	if (huart->Instance == USART2) {
+			MRC.com.RxFlag = 1;
+      memcpy(&MRC.com.cmd_msg, MRC.com.cmd_msg_buffer, MRC.com.RxLen);
+      memset(MRC.com.cmd_msg_buffer, 0, MRC.com.RxLen);
+      HAL_UART_Receive_DMA(MRC.com.mrc_huart, MRC.com.cmd_msg_buffer, MRC.com.RxLen);
+	}
+}
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {

@@ -59,3 +59,4 @@ safemrc\main.o: ../Device/Inc/drv_vnh7040.h
 safemrc\main.o: ../Common/Inc/pid_controller.h
 safemrc\main.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdbool.h
 safemrc\main.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
+safemrc\main.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\string.h

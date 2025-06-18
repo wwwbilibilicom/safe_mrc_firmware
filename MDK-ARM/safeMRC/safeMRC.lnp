@@ -9,6 +9,7 @@
 "safemrc\drv_led.o"
 "safemrc\drv_vnh7040.o"
 "safemrc\kth78xx.o"
+"safemrc\mrc_com.o"
 "safemrc\main.o"
 "safemrc\gpio.o"
 "safemrc\adc.o"

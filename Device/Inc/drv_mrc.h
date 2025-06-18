@@ -32,7 +32,6 @@ extern "C"
 
 #pragma pack(1)
 
-
     /**
      * @brief Structure representing the MR device.
      *
@@ -65,15 +64,61 @@ extern "C"
 
     } Device_MRC_t;
 #pragma pack()
-    void MRC_Init(const uint8_t *dev_name, Device_MRC_t *MRC, uint8_t id); 
-    void MRC_set_voltage(Device_MRC_t *MRC);
-    void MRC_collision_detect(Device_MRC_t *MRC1, Device_MRC_t *MRC2, float param, float threshold);
-    int MRC_Cmd_Msg_Extract(Device_MRC_t *device);
-    void MRC_Fbk_Msg_Modify(Device_MRC_t *device);
-    void MRC_Com_Exchange(Device_MRC_t *MRC);
-    void MRC_Key1_Reaction(Device_MRC_t *MRC);
-    void MRC_Key2_Reaction(Device_MRC_t *MRC);
 
+    /**
+     * @brief Initialize MRC device
+     * @param dev_name Device name
+     * @param MRC MRC device structure pointer
+     * @param id Device ID
+     * 
+     * @note This function will initialize all MRC sub-devices, including LED, key, encoder, VNH7040, etc.
+     * @note Also initializes the MRC communication module with DMA support
+     */
+    void MRC_Init(const uint8_t *dev_name, Device_MRC_t *MRC, uint8_t id);
+    
+    /**
+     * @brief Set MRC coil voltage
+     * @param MRC MRC device structure pointer
+     * 
+     * @note Calculate and set coil voltage based on target torque and PID controller
+     */
+    void MRC_set_voltage(Device_MRC_t *MRC);
+    
+    /**
+     * @brief Collision detection
+     * @param MRC1 First MRC device structure pointer
+     * @param MRC2 Second MRC device structure pointer
+     * @param param Detection parameter
+     * @param threshold Detection threshold
+     * 
+     * @note Detect collision by comparing states of two MRC devices
+     */
+    void MRC_collision_detect(Device_MRC_t *MRC1, Device_MRC_t *MRC2, float param, float threshold);
+    
+    /**
+     * @brief MRC communication process using new mrc_com module
+     * @param MRC MRC device structure pointer
+     * 
+     * @note Handle communication with host computer using DMA mode
+     * @note Extract command and send feedback automatically
+     */
+    void MRC_Com_Process(Device_MRC_t *MRC);
+    
+    /**
+     * @brief Handle KEY1 response
+     * @param MRC MRC device structure pointer
+     * 
+     * @note Handle response logic when KEY1 is pressed
+     */
+    void MRC_Key1_Reaction(Device_MRC_t *MRC);
+    
+    /**
+     * @brief Handle KEY2 response
+     * @param MRC MRC device structure pointer
+     * 
+     * @note Handle response logic when KEY2 is pressed
+     */
+    void MRC_Key2_Reaction(Device_MRC_t *MRC);
 
 #ifdef __cplusplus
     }

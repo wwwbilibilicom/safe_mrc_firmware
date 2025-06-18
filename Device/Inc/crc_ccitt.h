@@ -9,7 +9,16 @@
  * https://github.com/torvalds/linux/blob/5bfc75d92efd494db37f5c4c173d3639d4772966/lib/crc-ccitt.c
  */
 
-
+/**
+ * @brief Calculate CRC-CCITT checksum
+ * @param crc Initial CRC value, typically use 0xFFFF
+ * @param buffer Pointer to data buffer to calculate CRC
+ * @param len Data length (number of bytes)
+ * @return Calculated CRC-CCITT checksum
+ * 
+ * @note This is a CRC-CCITT variant implementation with polynomial x^16 + x^12 + x^5 + 1
+ * @note Suitable for data integrity verification, such as error detection in communication protocols
+ */
 uint16_t crc_ccitt(uint16_t crc, uint8_t const *buffer, uint8_t len);
 
 

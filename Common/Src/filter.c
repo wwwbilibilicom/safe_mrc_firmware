@@ -4,32 +4,32 @@
 #define TICK_TIMER HAL_GetTick()
 
 /**
- * 创建移动平均滤波器上下文
+ * Create moving average filter context
  *
- * 该函数初始化一个移动平均滤波器的上下文结构体，为其分配缓冲区并设置初始值。
- * 它适用于在滤波器中处理连续的样本数据，通过计算一段时间内的平均值来平滑数据。
+ * This function initializes a moving average filter context structure, allocates buffer and sets initial values.
+ * It is suitable for processing continuous sample data in filters, smoothing data by calculating the average over a period of time.
  *
- * @param context 指向移动平均滤波器上下文结构体的指针
- * @param filter_size 滤波器的大小，即用于计算平均值的样本数量
- * @param sample_time 样本的时间间隔，用于计算新样本是否应该被加入到滤波器中
+ * @param context Pointer to the moving average filter context structure
+ * @param filter_size Size of the filter, i.e., the number of samples used to calculate the average
+ * @param sample_time Time interval between samples, used to determine if a new sample should be added to the filter
  */
 void moving_average_create(movingAverage_t *context,
                            uint16_t filter_size,
                            uint16_t sample_time)
 {
-    // 释放之前可能分配的缓冲区，以避免内存泄漏
+    // Free previously allocated buffer to avoid memory leaks
     free(context->buffer);
 
-    // 初始化滤波器的大小，缓冲区大小，以及所有其他相关变量
+    // Initialize filter size, buffer size, and all other related variables
     context->size = filter_size;
-    // 分配足够空间用于存储滤波器大小的浮点数样本
+    // Allocate sufficient space for storing filter_size float samples
     context->buffer = (float *)malloc(filter_size * sizeof(float));
-    context->index = 0;                 // 当前样本索引
-    context->sum = 0;                   // 用于计算平均值的总和
-    context->fill = 0;                  // 当前缓冲区的填充程度
-    context->filtered = 0;              // 已经经过滤波处理的样本数量
-    context->sample_time = sample_time; // 样本的时间间隔
-    context->last_time = 0;             // 上次处理样本的时间戳
+    context->index = 0;                 // Current sample index
+    context->sum = 0;                   // Sum used to calculate average
+    context->fill = 0;                  // Current buffer fill level
+    context->filtered = 0;              // Number of samples that have been filtered
+    context->sample_time = sample_time; // Time interval between samples
+    context->last_time = 0;             // Timestamp of last processed sample
 }
 
 /**
@@ -92,13 +92,13 @@ void FirstOrder_KalmanFilter_Init(FirstOrderKalmanFilter *KalmanFilter, float Q,
 
 float FirstOrder_KalmanFilter_Update(FirstOrderKalmanFilter *KalmanFilter, float input)
 {
-    // 预测协方差方程：k时刻系统估算协方差 = k-1时刻的系统协方差 + 过程噪声协方差
+    // Prediction covariance equation: k-th moment system estimation covariance = k-1 moment system covariance + process noise covariance
     KalmanFilter->Now_P = KalmanFilter->LastP + KalmanFilter->Q;
-    // 卡尔曼增益方程：卡尔曼增益 = k时刻系统估算协方差 / （k时刻系统估算协方差 + 观测噪声协方差）
+    // Kalman gain equation: Kalman gain = k-th moment system estimation covariance / (k-th moment system estimation covariance + observation noise covariance)
     KalmanFilter->Kg = KalmanFilter->Now_P / (KalmanFilter->Now_P + KalmanFilter->R);
-    // 更新最优值方程：k时刻状态变量的最优值 = 状态变量的预测值 + 卡尔曼增益 * （测量值 - 状态变量的预测值）
-    KalmanFilter->out = KalmanFilter->out + KalmanFilter->Kg * (input - KalmanFilter->out); // 因为这一次的预测值就是上一次的输出值
-    // 更新协方差方程: 本次的系统协方差付给 KalmanFilter->LastP 威下一次运算准备。
+    // Update optimal value equation: k-th moment state variable optimal value = state variable prediction value + Kalman gain * (measurement value - state variable prediction value)
+    KalmanFilter->out = KalmanFilter->out + KalmanFilter->Kg * (input - KalmanFilter->out); // Because this prediction value is the last output value
+    // Update covariance equation: assign this system covariance to KalmanFilter->LastP for next calculation preparation.
     KalmanFilter->LastP = (1 - KalmanFilter->Kg) * KalmanFilter->Now_P;
     return KalmanFilter->out;
 }
@@ -106,7 +106,7 @@ float FirstOrder_KalmanFilter_Update(FirstOrderKalmanFilter *KalmanFilter, float
 
 
 
-#define SAMPLE_RATE 1000.0f //采样频率Hz
+#define SAMPLE_RATE 1000.0f // Sampling frequency Hz
 #define PI 3.1415926f
 
 
@@ -118,8 +118,8 @@ void HighPassFilter_Init(Filter *filter,float SampleRate,float CutoffFreq){
     filter->b0 = alpha;
     filter->b1 = -alpha;
     filter->a1 = alpha;
-    filter->x1 = 0.0f;  //历史输入值
-    filter->y1 = 0.0f;  //历史输出值
+    filter->x1 = 0.0f;  // Historical input value
+    filter->y1 = 0.0f;  // Historical output value
 }
 
 void LowPassFilter_Init(Filter *filter,float SampleRate,float CutoffFreq){
@@ -135,9 +135,9 @@ void LowPassFilter_Init(Filter *filter,float SampleRate,float CutoffFreq){
 }
 
 float ApplyFilter(Filter* filter, float input) {
-    float output = filter->b0 * input + filter->b1 * filter->x1 + filter->a1 * filter->y1;  //一阶IIR滤波公式
+    float output = filter->b0 * input + filter->b1 * filter->x1 + filter->a1 * filter->y1;  // First-order IIR filter formula
 
-    // 更新历史值
+    // Update historical values
     filter->x1 = input;
     filter->y1 = output;
 

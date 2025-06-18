@@ -3,34 +3,59 @@
 
 #include <stdint.h>
 
-#define STEP_ANGLE 0.01f // 每次电机移动的最小角度，单位：rad
+#define STEP_ANGLE 0.01f // Minimum angle for each motor movement, unit: rad
 
 #pragma pack(1)
 typedef struct
 {
-    float target_position;       // 目标位置
-    float current_position;      // 当前的位置
-    float interpolated_position; // 插值后的目标位置
+    float target_position;       // Target position
+    float current_position;      // Current position
+    float interpolated_position; // Interpolated target position
 
-    // 三次样条系数
+    // Cubic spline coefficients
     float a, b, c, d;
 
-    // 插值步数和进度
+    // Interpolation step count and progress
     int current_step;
     int total_steps;
     float step_size;
 } Trajectory;
 #pragma pack()
-// 初始化轨迹
+
+/**
+ * @brief Initialize trajectory planner
+ * @param trajectory Trajectory structure pointer
+ * @param current_position Current position
+ * @param target_position Target position
+ * 
+ * @note This function will calculate cubic spline interpolation coefficients for smooth trajectory planning
+ */
 void Trajectory_Init(Trajectory *trajectory, float current_position, float target_position);
 
-// 获取插值后的目标位置
+/**
+ * @brief Get interpolated target position
+ * @param trajectory Trajectory structure pointer
+ * @return Interpolated target position
+ * 
+ * @note Calculate cubic spline interpolated position based on current step
+ */
 float Trajectory_GetTargetPosition(Trajectory *trajectory);
 
-// 更新插值状态
+/**
+ * @brief Update interpolation status
+ * @param trajectory Trajectory structure pointer
+ * 
+ * @note Update current step count and advance trajectory execution progress
+ */
 void Trajectory_Update(Trajectory *trajectory);
 
-// 检查是否轨迹完成
+/**
+ * @brief Check if trajectory is complete
+ * @param trajectory Trajectory structure pointer
+ * @return 1: trajectory complete, 0: trajectory incomplete
+ * 
+ * @note Determine if trajectory execution is finished by comparing current step and total steps
+ */
 int Trajectory_IsComplete(Trajectory *trajectory);
 
 #endif // TRAJECTORY_H

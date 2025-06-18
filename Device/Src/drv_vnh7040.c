@@ -9,6 +9,21 @@ uint16_t prescaler = 9 - 1;       // Set the prescaler
 uint64_t tim_clk_freq = 72000000; // Set the timer clock frequency
 uint32_t ADC_BUFFER[1]; // Buffer for ADC test
 
+/**
+ * @brief Initialize VNH7040 motor driver chip
+ * @param dev_name Device name
+ * @param device VNH7040 device structure pointer
+ * @param INA INA pin GPIO port
+ * @param INA_PIN INA pin number
+ * @param INB INB pin GPIO port
+ * @param INB_PIN INB pin number
+ * @param PWM_tim PWM timer handle pointer
+ * @param PWM_channel PWM channel number
+ * @param ADC_handle ADC handle pointer
+ * 
+ * @note This function will initialize VNH7040's GPIO, PWM and ADC configuration
+ * @note Start PWM output and configure ADC calibration and DMA transmission
+ */
 void drv_VNH7040_init(  uint8_t const *dev_name, Device_VNH7040_t *device, GPIO_TypeDef *INA, uint16_t INA_PIN,
                 GPIO_TypeDef *INB, uint16_t INB_PIN, TIM_HandleTypeDef *PWM_tim, uint32_t PWM_channel, ADC_HandleTypeDef *ADC_handle)
 {
@@ -34,7 +49,16 @@ void drv_VNH7040_init(  uint8_t const *dev_name, Device_VNH7040_t *device, GPIO_
     printf("device VNH7040(%s) init success!\n", dev_name);
 }
 
-
+/**
+ * @brief Set PWM parameters
+ * @param htim Timer handle pointer
+ * @param Channel PWM channel number
+ * @param freq PWM frequency (Hz)
+ * @param duty Duty cycle (0.0-100.0)
+ * 
+ * @note This function will configure the timer's PWM frequency and duty cycle
+ * @note Calculate PWM parameters based on timer clock frequency and prescaler
+ */
 void Set_PWM_Param(TIM_HandleTypeDef *htim, uint32_t Channel, uint32_t freq, float duty)
 {
     float pwm_freq_arr = (tim_clk_freq * 1.0f) / (prescaler + 1) / freq * 1.0f - 1; // Calculate PWM frequency
@@ -45,6 +69,15 @@ void Set_PWM_Param(TIM_HandleTypeDef *htim, uint32_t Channel, uint32_t freq, flo
     __HAL_TIM_SetCompare(htim, Channel, (uint16_t)pwm_duty_pulse); // Set the timer compare value
 }
 
+/**
+ * @brief Set VNH7040 output voltage
+ * @param device VNH7040 device structure pointer
+ * @param voltage Target voltage value (-12V to +12V)
+ * 
+ * @note This function will set PWM duty cycle based on target voltage
+ * @note Positive voltage enables OUTA, negative voltage enables OUTB
+ * @note Voltage will be limited within the power supply voltage range
+ */
 void VNH7040_Set_Voltage(Device_VNH7040_t *device, float voltage)
 {
     float duty;
@@ -77,6 +110,13 @@ void VNH7040_Set_Voltage(Device_VNH7040_t *device, float voltage)
     }
 }
 
+/**
+ * @brief VNH7040 multi-sensor ADC processing
+ * @param device VNH7040 device structure pointer
+ * 
+ * @note This function will read ADC value and update actual voltage value
+ * @note Calculate actual voltage based on ADC value, coil resistance and oversampling ratio
+ */
 void VNH7070_Multisense_ADC_process(Device_VNH7040_t *device)
 {
     device->actual_voltage = 12.3*COIL_RESISTANCE*(float)ADC_BUFFER[0] * 3.3f / (4095 * ADC_OVER_SAMPLING_RATIO);

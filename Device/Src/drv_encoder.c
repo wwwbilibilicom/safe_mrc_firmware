@@ -49,7 +49,7 @@ void CaptureDutyCycle(Device_encoder_t *Encoder_dev)
         // Encoder_dev->Encoder_Duty.CapVal[0] = HAL_TIM_ReadCapturedValue(Encoder_dev->htim, Encoder_dev->Channel);
         // printf("Capture CapVal0 is :%d\n",Encoder_dev->Encoder_Duty.CapVal[0]);
         Encoder_dev->Encoder_Duty.CapIndex = Falling;
-        __HAL_TIM_SET_COUNTER(Encoder_dev->htim, 0); // 计数清零，从头开始计
+        __HAL_TIM_SET_COUNTER(Encoder_dev->htim, 0); // Reset counter, start counting from beginning
         __HAL_TIM_SET_CAPTUREPOLARITY(Encoder_dev->htim, Encoder_dev->Channel, TIM_INPUTCHANNELPOLARITY_FALLING);
         break;
 
@@ -66,7 +66,7 @@ void CaptureDutyCycle(Device_encoder_t *Encoder_dev)
         HAL_TIM_IC_Stop_IT(Encoder_dev->htim, Encoder_dev->Channel);
         Encoder_dev->Encoder_Duty.CapIndex = First_Rrising;
         Encoder_dev->Encoder_Duty.CapFlag = 1;
-        __HAL_TIM_SET_COUNTER(Encoder_dev->htim, 0); // 计数清零，从头开始计
+        __HAL_TIM_SET_COUNTER(Encoder_dev->htim, 0); // Reset counter, start counting from beginning
         break;
 
     default:
@@ -75,6 +75,13 @@ void CaptureDutyCycle(Device_encoder_t *Encoder_dev)
     }
 }
 
+/**
+ * @brief Read encoder angle through SPI
+ * @param Encoder_dev Encoder device structure pointer
+ * 
+ * @note Suitable for encoder chips that support SPI communication, such as KTH78xx series
+ * @note Directly read the raw angle value from the encoder chip
+ */
 void Encoder_SPI_ReadAngle(Device_encoder_t *Encoder_dev){
     Encoder_dev->raw_angle = KTH78_ReadAngle();
 }
@@ -124,17 +131,29 @@ void Encoder_Calibrate_n_Filter(Device_encoder_t *Encoder_dev)
     HAL_TIM_IC_Start_IT(Encoder_dev->htim, Encoder_dev->Channel);
 }
 
-//编码器参数
-#define ENCODER_RESOLUTION 4096 //编码器分辨率(每圈脉冲数)
-#define SAMPLE_INTERVAL_MS 10   //采样间隔(毫秒)
+// Encoder parameters
+#define ENCODER_RESOLUTION 4096 // Encoder resolution (pulses per revolution)
+#define SAMPLE_INTERVAL_MS 10   // Sampling interval (milliseconds)
 #define PI 3.14159f
 
-//获取当前时间
+/**
+ * @brief Get current time
+ * @return Current system time (milliseconds)
+ * 
+ * @note Use HAL_GetTick() to get system running time
+ */
 uint32_t getCurrentTime(){
     return HAL_GetTick();
 }
 
-//calculate angular velocity
+/**
+ * @brief Calculate angular velocity
+ * @param Encoder_dev Encoder device structure pointer
+ * 
+ * @note Calculate angular velocity based on encoder position change, unit is rad/s
+ * @note Use differential method to calculate angular velocity, including angle jump handling
+ * @note Sampling interval is 10ms to ensure calculation accuracy
+ */
 void CalAngularVelocity(Device_encoder_t *Encoder_dev){
     Encoder_dev->CurrentTime=getCurrentTime();
     Encoder_dev->CurrentEncoderValRad=(Encoder_dev->filtered_angle)*PI/180;
@@ -155,6 +174,18 @@ void CalAngularVelocity(Device_encoder_t *Encoder_dev){
         Encoder_dev->PreviousEncoderValRad=Encoder_dev->CurrentEncoderValRad;
         Encoder_dev->PreviousTime=Encoder_dev->CurrentTime;
     }
+}
+
+/**
+ * @brief Get encoder position
+ * @param Encoder_dev Encoder device structure pointer
+ * @return Current encoder position (degrees)
+ * 
+ * @note Returns the filtered angle value
+ */
+float Encoder_GetPos(Device_encoder_t *Encoder_dev)
+{
+    return Encoder_dev->filtered_angle;
 }
 
 
