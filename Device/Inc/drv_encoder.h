@@ -48,10 +48,10 @@ extern "C"
         PWM_DUTY_Capture Encoder_Duty;
         FirstOrderKalmanFilter Encoder_KF;
         movingAverage_t movingAverage;
-        float raw_angle;
-        float filtered_angle;
-        float initial_angle;
-        float diff_angle;
+        float raw_angle;  // 编码器未处理角度，单位：度
+        float filtered_angle;  // 编码器滤波后角度，单位：度
+        float initial_angle;  // 编码器初始角度，单位：度
+        float diff_angle;  // 编码器角度差，单位：度
 
         float CurrentEncoderValRad;  // 当前编码器值
         float PreviousEncoderValRad;// 上一次编码器值
@@ -69,6 +69,7 @@ extern "C"
     void Encoder_Calibrate_n_Filter(Device_encoder_t *Encoder_dev);
     void CaptureDutyCycle(Device_encoder_t *Encoder_dev);
     void CalAngularVelocity(Device_encoder_t *Encoder_dev);
+    void Encoder_SPI_ReadAngle(Device_encoder_t *Encoder_dev);
 
     // extern Device_encoder_t Encoder_dev;
 

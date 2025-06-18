@@ -3,6 +3,7 @@
 #include "drv_encoder.h"
 #include "tim.h"
 #include "stdint.h"
+#include "kth78xx.h"
 #ifdef FREERTOS
 #include "cmsis_os.h"
 #endif
@@ -74,6 +75,9 @@ void CaptureDutyCycle(Device_encoder_t *Encoder_dev)
     }
 }
 
+void Encoder_SPI_ReadAngle(Device_encoder_t *Encoder_dev){
+    Encoder_dev->raw_angle = KTH78_ReadAngle();
+}
 
 /**
  * @brief Calibrates and filters the Encoder device.

@@ -20,6 +20,7 @@
 #include "main.h"
 #include "adc.h"
 #include "dma.h"
+#include "spi.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -53,7 +54,6 @@ Device_MRC_t MRC;
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
-void MRC_Com_Exchange(Device_MRC_t *MRC);
 static void MPU_Config(void);
 /* USER CODE BEGIN PFP */
 
@@ -107,6 +107,7 @@ int main(void)
   MX_TIM6_Init();
   MX_UART4_Init();
   MX_TIM7_Init();
+  MX_SPI4_Init();
   /* USER CODE BEGIN 2 */
   MRC_Init((uint8_t *)"MRC", &MRC, 1);
   /* USER CODE END 2 */
@@ -136,8 +137,6 @@ int main(void)
   }
   /* USER CODE END 3 */
 }
-
-
 
 /**
   * @brief System Clock Configuration

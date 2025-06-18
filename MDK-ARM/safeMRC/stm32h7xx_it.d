@@ -35,6 +35,8 @@ safemrc\stm32h7xx_it.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_i2c.h
 safemrc\stm32h7xx_it.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_i2c_ex.h
 safemrc\stm32h7xx_it.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pwr.h
 safemrc\stm32h7xx_it.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pwr_ex.h
+safemrc\stm32h7xx_it.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_spi.h
+safemrc\stm32h7xx_it.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_spi_ex.h
 safemrc\stm32h7xx_it.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim.h
 safemrc\stm32h7xx_it.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim_ex.h
 safemrc\stm32h7xx_it.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart.h
@@ -47,10 +49,10 @@ safemrc\stm32h7xx_it.o: ../Core/Inc/adc.h
 safemrc\stm32h7xx_it.o: ../Device/Inc/drv_led.h
 safemrc\stm32h7xx_it.o: ../Device/Inc/drv_key.h
 safemrc\stm32h7xx_it.o: ../Device/Inc/drv_encoder.h
-safemrc\stm32h7xx_it.o: ..\Common\Inc\filter.h
+safemrc\stm32h7xx_it.o: ../Common/Inc/filter.h
 safemrc\stm32h7xx_it.o: ../Device/Inc/stdint.h
 safemrc\stm32h7xx_it.o: ../Device/Inc/mrc_com.h
 safemrc\stm32h7xx_it.o: ../Device/Inc/mrc_protocol.h
 safemrc\stm32h7xx_it.o: ../Device/Inc/drv_vnh7040.h
-safemrc\stm32h7xx_it.o: ..\Common\Inc\pid_controller.h
+safemrc\stm32h7xx_it.o: ../Common/Inc/pid_controller.h
 safemrc\stm32h7xx_it.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdbool.h

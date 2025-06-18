@@ -34,6 +34,8 @@ safemrc\stm32h7xx_hal_tim.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_i
 safemrc\stm32h7xx_hal_tim.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_i2c_ex.h
 safemrc\stm32h7xx_hal_tim.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pwr.h
 safemrc\stm32h7xx_hal_tim.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pwr_ex.h
+safemrc\stm32h7xx_hal_tim.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_spi.h
+safemrc\stm32h7xx_hal_tim.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_spi_ex.h
 safemrc\stm32h7xx_hal_tim.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim.h
 safemrc\stm32h7xx_hal_tim.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim_ex.h
 safemrc\stm32h7xx_hal_tim.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart.h

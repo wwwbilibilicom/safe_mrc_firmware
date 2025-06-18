@@ -37,11 +37,13 @@ safemrc\drv_encoder.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_i2c.h
 safemrc\drv_encoder.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_i2c_ex.h
 safemrc\drv_encoder.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pwr.h
 safemrc\drv_encoder.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pwr_ex.h
+safemrc\drv_encoder.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_spi.h
+safemrc\drv_encoder.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_spi_ex.h
 safemrc\drv_encoder.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim.h
 safemrc\drv_encoder.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim_ex.h
 safemrc\drv_encoder.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart.h
 safemrc\drv_encoder.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h
 safemrc\drv_encoder.o: ../Device/Inc/drv_encoder.h
-safemrc\drv_encoder.o: ..\Common\Inc\filter.h
+safemrc\drv_encoder.o: ../Common/Inc/filter.h
 safemrc\drv_encoder.o: ../Device/Inc/stdint.h
 safemrc\drv_encoder.o: ../Core/Inc/tim.h
