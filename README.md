@@ -72,27 +72,85 @@ while(1) {
 
 ### Communication Protocol
 
-The system uses a binary protocol with request-response pattern:
+#### Hardware Interface
 
-#### Command Message (8 bytes) - Host → Device
-```
-[0-1] Header: 0xFE 0xEE
-[2]   Device ID
-[3]   Mode
-[4-5] Target Torque (16-bit)
-[6-7] CRC-16
+- **Physical Layer**: RS-485 differential bus
+- **Baudrate**: 4 Mbps (4000000 bps)
+- **Topology**: Multi-drop (one master, multiple slaves)
+- **Connector**: Standard 485-A/B differential pair
+
+#### Protocol Overview
+
+- **Pattern**: Request-Response (Master sends command, slave responds)
+- **Frame Format**: Binary, fixed length
+- **Error Checking**: CRC-16-CCITT (poly=0x1021, init=0xFFFF, no xorout, no reflection)
+- **Bus Arbitration**: Only one device transmits at a time (slave only responds after receiving a command)
+
+---
+
+#### Command Message (Host → Device, 8 bytes)
+
+| Byte Index | Field Name      | Size (bytes) | Description                        |
+|------------|----------------|--------------|------------------------------------|
+| 0-1        | Header         | 2            | Frame header, fixed 0xFE, 0xEE     |
+| 2          | Device ID      | 1            | Target device address (0-255)      |
+| 3          | Mode           | 1            | Work mode (see below)              |
+| 4-5        | Target Torque  | 2            | Target torque, uint16, little-endian|
+| 6-7        | CRC-16-CCITT   | 2            | CRC of bytes 0-5, little-endian    |
+
+#### Feedback Message (Device → Host, 13 bytes)
+
+| Byte Index | Field Name      | Size (bytes) | Description                        |
+|------------|----------------|--------------|------------------------------------|
+| 0-1        | Header         | 2            | Frame header, fixed 0xFE, 0xEE     |
+| 2          | Device ID      | 1            | Responding device address          |
+| 3          | Mode           | 1            | Current work mode                  |
+| 4          | Collision Flag | 1            | 0: safe, 1: collision detected     |
+| 5-8        | Encoder Value  | 4            | Encoder reading, uint32, little-endian |
+| 9-10       | Present Torque | 2            | Current torque, uint16, little-endian |
+| 11-12      | CRC-16-CCITT   | 2            | CRC of bytes 0-10, little-endian   |
+
+---
+
+#### CRC-16-CCITT Calculation
+
+- **Polynomial**: 0x1021
+- **Initial Value**: 0xFFFF
+- **Input/Output Reflection**: None
+- **Final XOR**: None
+- **Range**: For command, CRC covers bytes 0-5; for feedback, CRC covers bytes 0-10
+
+**Example (C code):**
+```c
+uint16_t crc_ccitt(uint16_t crc, const uint8_t *data, size_t len);
 ```
 
-#### Feedback Message (13 bytes) - Device → Host
-```
-[0-1] Header: 0xFE 0xEE
-[2]   Device ID
-[3]   Mode
-[4-7] Encoder Value (32-bit)
-[8-9] Present Torque (16-bit)
-[10]  Collision Flag
-[11-12] CRC-16
-```
+---
+
+#### Mode Field Definition (MRC_Mode)
+
+| Value | Name         | Description                |
+|-------|-------------|---------------------------|
+| 0     | FREE        | Free mode (no output)     |
+| 1     | FIX_LIMIT   | Fixed limit mode          |
+| 2     | ADAPTATION  | Adaptation mode           |
+
+---
+
+#### Example Communication Sequence
+
+1. The host sends an 8-byte command frame to the RS-485 bus.
+2. The target device verifies the ID and CRC, then parses the command.
+3. The device replies with a 13-byte feedback frame containing its current status.
+4. The host verifies the feedback CRC and reads the status.
+
+---
+
+#### Physical Layer Notes
+
+- All nodes should use RS-485 transceivers; termination resistors (e.g., 120Ω) are recommended on A/B lines.
+- At 4 Mbps, cable length should be limited to several tens of meters, and shielded twisted pair is recommended.
+- In case of communication errors, the host should retransmit the command.
 
 ### Hardware Drivers
 
