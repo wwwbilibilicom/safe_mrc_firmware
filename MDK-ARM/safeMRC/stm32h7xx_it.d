@@ -56,3 +56,4 @@ safemrc\stm32h7xx_it.o: ../Device/Inc/mrc_protocol.h
 safemrc\stm32h7xx_it.o: ../Device/Inc/drv_vnh7040.h
 safemrc\stm32h7xx_it.o: ../Common/Inc/pid_controller.h
 safemrc\stm32h7xx_it.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdbool.h
+safemrc\stm32h7xx_it.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\string.h

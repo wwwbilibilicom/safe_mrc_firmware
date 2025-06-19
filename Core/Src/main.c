@@ -214,16 +214,6 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 	}
 }
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-	if (huart->Instance == USART2) {
-			MRC.com.RxFlag = 1;
-      memcpy(&MRC.com.cmd_msg, MRC.com.cmd_msg_buffer, MRC.com.RxLen);
-      memset(MRC.com.cmd_msg_buffer, 0, MRC.com.RxLen);
-      HAL_UART_Receive_DMA(MRC.com.mrc_huart, MRC.com.cmd_msg_buffer, MRC.com.RxLen);
-	}
-}
-
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if (htim->Instance == TIM6)

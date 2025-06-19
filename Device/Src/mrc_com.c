@@ -39,15 +39,8 @@ int MRC_Com_Init(MRC_Com_t *mrc_com, UART_HandleTypeDef *huart, uint8_t id)
     mrc_com->cmd_correct = 0;
     
     // Clear DMA receive structure (since DMA receives directly into cmd_msg)
-    memset((uint8_t*)&mrc_com->cmd_msg, 0, sizeof(mrc_com->cmd_msg));
-    
-    // Initialize command protocol structure
-    mrc_com->cmd_msg.head[0] = MRC_HEAD_HIGH;
-    mrc_com->cmd_msg.head[1] = MRC_HEAD_LOW;
-    mrc_com->cmd_msg.id = id;
-    mrc_com->cmd_msg.mode = FREE;
-    mrc_com->cmd_msg.des_torque = 0;
-    mrc_com->cmd_msg.CRC16Data = 0;
+    memset((uint8_t*)&mrc_com->cmd_msg, 0, mrc_com->RxLen);
+    memset(mrc_com->cmd_msg_buffer, 0, mrc_com->RxLen);
     
     // Initialize feedback protocol structure
     mrc_com->fbk_msg.head[0] = MRC_HEAD_HIGH;
@@ -58,9 +51,11 @@ int MRC_Com_Init(MRC_Com_t *mrc_com, UART_HandleTypeDef *huart, uint8_t id)
     mrc_com->fbk_msg.encoder_value = 0;
     mrc_com->fbk_msg.present_torque = 0;
     mrc_com->fbk_msg.CRC16Data = 0;
+
+    __HAL_UART_ENABLE_IT(mrc_com->mrc_huart, UART_IT_IDLE);
     
     // Start DMA reception for command messages
-    HAL_UART_Receive_DMA(huart, mrc_com->cmd_msg_buffer, MRC_CMD_SIZE);
+    HAL_UART_Receive_DMA(mrc_com->mrc_huart, mrc_com->cmd_msg_buffer, MRC_CMD_SIZE);
     
     return 0;
 }
@@ -176,6 +171,6 @@ void MRC_Com_Reset(MRC_Com_t *mrc_com)
     memset((uint8_t*)&mrc_com->cmd_msg, 0, sizeof(mrc_com->cmd_msg));
     
     // Restart DMA reception
-    HAL_UART_Receive_DMA(mrc_com->mrc_huart, (uint8_t*)&mrc_com->cmd_msg, mrc_com->RxLen);
+    HAL_UART_Receive_DMA(mrc_com->mrc_huart, mrc_com->cmd_msg_buffer, MRC_CMD_SIZE);
 }
 

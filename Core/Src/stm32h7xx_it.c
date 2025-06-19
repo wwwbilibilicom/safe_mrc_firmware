@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "drv_mrc.h"
+#include "string.h"
 extern Device_MRC_t MRC;
 /* USER CODE END Includes */
 
@@ -351,6 +352,15 @@ void USART2_IRQHandler(void)
   /* USER CODE END USART2_IRQn 0 */
   HAL_UART_IRQHandler(&huart2);
   /* USER CODE BEGIN USART2_IRQn 1 */
+  if(__HAL_UART_GET_FLAG(&huart2, UART_FLAG_IDLE) != RESET)
+  {
+    __HAL_UART_CLEAR_IDLEFLAG(&huart2);
+    HAL_UART_DMAStop(&huart2);
+    MRC.com.RxFlag = 1;
+    memcpy(&MRC.com.cmd_msg, MRC.com.cmd_msg_buffer, MRC.com.RxLen);
+    memset(MRC.com.cmd_msg_buffer, 0, MRC.com.RxLen);
+    HAL_UART_Receive_DMA(MRC.com.mrc_huart, MRC.com.cmd_msg_buffer, MRC.com.RxLen);
+  }
 
   /* USER CODE END USART2_IRQn 1 */
 }
