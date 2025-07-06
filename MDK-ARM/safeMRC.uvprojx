@@ -786,6 +786,11 @@
               <FileType>1</FileType>
               <FilePath>..\Common\Src\filter.c</FilePath>
             </File>
+            <File>
+              <FileName>sys_clock.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Common\Src\sys_clock.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
