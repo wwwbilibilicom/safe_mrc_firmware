@@ -435,6 +435,16 @@
               <FileType>1</FileType>
               <FilePath>..\Device\Src\mrc_com.c</FilePath>
             </File>
+            <File>
+              <FileName>mrc_debugcli.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Device\Src\mrc_debugcli.c</FilePath>
+            </File>
+            <File>
+              <FileName>mrc_statemachine.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Device\Src\mrc_statemachine.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

@@ -12,7 +12,8 @@ typedef enum MRC_Mode
 {
     FREE,
     FIX_LIMIT,
-    ADAPTATION
+    ADAPTATION,
+    DEBUG
 } MRC_Mode;
 
 #pragma pack(1)
@@ -21,7 +22,7 @@ typedef enum MRC_Mode
         uint8_t head[2];                // 2 bytes 0xFE, 0xEE
         uint8_t id;                     // 1 bytes
         MRC_Mode mode;                  // 1 bytes
-        uint16_t des_torque;            // 2 bytes
+        uint16_t des_coil_current;            // 2 bytes
         uint16_t CRC16Data;             // 2 bytes
     } MRC_Cmd_Protocol;                 // 8 bytes 
 #pragma pack()
@@ -34,7 +35,7 @@ typedef enum MRC_Mode
         MRC_Mode mode;              // 1 bytes
         uint8_t collision_flag;             // 1 bytes 0x00: safely, 0x01: collision happened.
         uint32_t encoder_value;     // 4 bytes
-        uint16_t present_torque;    // 2 bytes
+        uint16_t present_current;    // 2 bytes
         uint16_t CRC16Data;         // 2 bytes
     } MRC_Fbk_Protocol;             // 13 bytes
 #pragma pack()

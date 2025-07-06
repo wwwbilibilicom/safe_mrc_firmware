@@ -12,6 +12,8 @@ extern "C"
 #include "cmsis_os.h"
 #endif
 #include <stm32h7xx_hal_tim.h>
+#include "sys_clock.h"
+#include "kth78xx.h"
 
     typedef enum
     {
@@ -45,21 +47,27 @@ extern "C"
         TIM_HandleTypeDef *htim;
         uint32_t Channel;
 
+        float real_freq;
+
         PWM_DUTY_Capture Encoder_Duty;
         FirstOrderKalmanFilter Encoder_KF;
-        movingAverage_t movingAverage;
         float raw_angle;  // Encoder unprocessed angle, unit: degrees
+        float previous_raw_angle; // Encoder unprocessed angle, unit: degrees
+        float zero_offset;      // initial angle in degrees
+        int32_t round_count;    // round count
+        float raw_continuous_angle; // raw continuous angle unit: degrees
         float filtered_angle;  // Encoder filtered angle, unit: degrees
-        float initial_angle;  // Encoder initial angle, unit: degrees
-        float diff_angle;  // Encoder angle difference, unit: degrees
-
-        float CurrentEncoderValRad;  // Current encoder value
-        float PreviousEncoderValRad;// Previous encoder value
-        uint32_t CurrentTime;
-        uint32_t PreviousTime;
+        
+        float CurrentEncoderValRad;  // Current encoder value in rad
+        float PreviousEncoderValRad;// Previous encoder value in rad
+        uint64_t CurrentTime;
+        uint64_t PreviousTime;
         float AngularVelocity; // Angular velocity, rad/s
         float filtered_anguvel;
+
         BandPassFilter bandPassFilter;
+        SimpleLowPassFilter lowPassFilter;
+        movingAverage_t movingAverage;
 
     } Device_encoder_t;
 #pragma pack()
@@ -74,6 +82,8 @@ extern "C"
      * @note This function will initialize encoder timer, filter and related parameters
      */
     int drv_encoder_init(Device_encoder_t *Encoder_dev, TIM_HandleTypeDef *Encoder_tim, uint32_t Encoder_ch);
+
+    static void Encoder_CalibrateZero(Device_encoder_t *Encoder_dev);
     
     /**
      * @brief Get encoder position
@@ -84,6 +94,10 @@ extern "C"
      */
     float Encoder_GetPos(Device_encoder_t *Encoder_dev);
     
+    static void Encoder_Calculate_From_Capture(Device_encoder_t *Encoder_dev);
+
+    static void Encoder_UpdateContiuousAngle(Device_encoder_t *Encoder_dev);
+
     /**
      * @brief Calibrate and filter encoder
      * @param Encoder_dev Encoder device structure pointer
@@ -115,6 +129,11 @@ extern "C"
      * @note Suitable for encoder chips that support SPI communication, such as KTH78xx series
      */
     void Encoder_SPI_ReadAngle(Device_encoder_t *Encoder_dev);
+
+    void Encoder_PWM_Start_ReadAngle(Device_encoder_t *Encoder_dev);
+
+//    uint32_t getCurrentTime(void);
+//    uint64_t getHighResTime_ns(void);
 
     // extern Device_encoder_t Encoder_dev;
 

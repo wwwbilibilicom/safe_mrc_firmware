@@ -50,12 +50,12 @@ int MRC_Com_UnpackCmd(MRC_Com_t *mrc_com);
  * @param mrc_com: MRC communication structure pointer
  * @param mode: Current work mode
  * @param encoder_value: Encoder angle value
- * @param present_torque: Current torque value
+ * @param present_current: Current torque value
  * @param collision_flag: Collision flag
  * @return 0: Success, -1: Failure
  */
 int MRC_Com_PackFbk(MRC_Com_t *mrc_com, MRC_Mode mode, uint32_t encoder_value, 
-                    uint16_t present_torque, uint8_t collision_flag);
+                    uint16_t present_currenttt, uint8_t collision_flag);
 
 /**
  * @brief Send feedback data using DMA (device side response)

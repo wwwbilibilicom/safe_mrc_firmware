@@ -84,7 +84,47 @@ void LowPassFilter_Init(Filter *filter,float SampleRate,float CutoffFreq);
 void BandPassFilter_Init(float highCutoffFreq, float lowCutoffFreq, float sampleRate, BandPassFilter *filter);
 float BandPassFilter_Update(BandPassFilter * filter, float input);
 
+/**
+ * @brief Simple first-order low-pass filter structure
+ *
+ * This structure holds the state for a simple exponential smoothing low-pass filter.
+ * The filter equation is: y[n] = alpha * x[n] + (1 - alpha) * y[n-1]
+ */
+#pragma pack(1)
+typedef struct {
+    float alpha;      /**< Smoothing factor (0 < alpha < 1) */
+    float prev;       /**< Previous output value */
+    uint8_t has_prev; /**< Flag to indicate if prev is valid */
+} SimpleLowPassFilter;
+#pragma pack()
 
+/**
+ * @brief Initialize a simple first-order low-pass filter using sample rate and cutoff frequency
+ *
+ * This function computes the smoothing factor (alpha) based on the sample rate and cutoff frequency.
+ *
+ * @param filter Pointer to the SimpleLowPassFilter structure
+ * @param sample_rate Sampling rate in Hz
+ * @param cutoff_freq Cutoff frequency in Hz
+ */
+void SimpleLowPassFilter_InitByCutoff(SimpleLowPassFilter *filter, float sample_rate, float cutoff_freq);
+
+/**
+ * @brief (Deprecated) Initialize a simple first-order low-pass filter with alpha
+ *
+ * @param filter Pointer to the SimpleLowPassFilter structure
+ * @param alpha Smoothing factor (0 < alpha < 1)
+ */
+void SimpleLowPassFilter_Init(SimpleLowPassFilter *filter, float alpha);
+
+/**
+ * @brief Update the low-pass filter with a new input value
+ *
+ * @param filter Pointer to the SimpleLowPassFilter structure
+ * @param input New input value to be filtered
+ * @return Filtered output value
+ */
+float SimpleLowPassFilter_Update(SimpleLowPassFilter *filter, float input);
 
 #ifdef __cplusplus
 }

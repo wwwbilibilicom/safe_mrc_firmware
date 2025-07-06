@@ -19,11 +19,9 @@ typedef struct Device_VNH7040_t
     uint32_t PWM_channel; // PWM
     GPIO_TypeDef *INA;
     uint32_t INA_PIN;
-    ADC_HandleTypeDef *ADC_handle;
     GPIO_TypeDef *INB;
     uint32_t INB_PIN;
     float des_voltage; // Desired voltage of the device
-    float actual_voltage; // Actual voltage of the device
 } Device_VNH7040_t;
 #pragma pack()
 
@@ -44,8 +42,7 @@ typedef struct Device_VNH7040_t
 void drv_VNH7040_init(const uint8_t *dev_name, Device_VNH7040_t *device,
                   GPIO_TypeDef *INA, uint16_t INA_PIN,
                   GPIO_TypeDef *INB, uint16_t INB_PIN,
-                  TIM_HandleTypeDef *PWM_tim, uint32_t PWM_channel, 
-                  ADC_HandleTypeDef *ADC_handle);
+                  TIM_HandleTypeDef *PWM_tim, uint32_t PWM_channel);
 
 /**
  * @brief Set PWM parameters
@@ -57,14 +54,6 @@ void drv_VNH7040_init(const uint8_t *dev_name, Device_VNH7040_t *device,
  * @note This function will configure timer PWM frequency and duty cycle
  */
 void Set_PWM_Param(TIM_HandleTypeDef *htim, uint32_t Channel, uint32_t freq, float duty);
-
-/**
- * @brief VNH7040 multi-sensor ADC processing
- * @param device VNH7040 device structure pointer
- * 
- * @note This function will read ADC value and update actual voltage value
- */
-void VNH7070_Multisense_ADC_process(Device_VNH7040_t *device);
 
 /**
  * @brief Set VNH7040 output voltage

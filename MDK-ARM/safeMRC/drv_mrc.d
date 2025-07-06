@@ -50,11 +50,13 @@ safemrc\drv_mrc.o: ../Device/Inc/drv_key.h
 safemrc\drv_mrc.o: ../Device/Inc/drv_encoder.h
 safemrc\drv_mrc.o: ../Common/Inc/filter.h
 safemrc\drv_mrc.o: ../Device/Inc/stdint.h
+safemrc\drv_mrc.o: ../Common/Inc/sys_clock.h
 safemrc\drv_mrc.o: ../Device/Inc/mrc_com.h
 safemrc\drv_mrc.o: ../Device/Inc/mrc_protocol.h
 safemrc\drv_mrc.o: ../Device/Inc/drv_vnh7040.h
 safemrc\drv_mrc.o: ../Common/Inc/pid_controller.h
 safemrc\drv_mrc.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdbool.h
+safemrc\drv_mrc.o: ../Device/Inc/mrc_statemachine.h
 safemrc\drv_mrc.o: ../Device/Inc/Array_user.h
 safemrc\drv_mrc.o: D:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
 safemrc\drv_mrc.o: ../Device/Inc/crc_ccitt.h

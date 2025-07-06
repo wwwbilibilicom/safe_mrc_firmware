@@ -13,8 +13,6 @@
 // Protocol constant definitions
 #define MRC_HEAD_HIGH    0xFE
 #define MRC_HEAD_LOW     0xEE
-#define MRC_CMD_SIZE     8
-#define MRC_FBK_SIZE     13
 
 /**
  * @brief Initialize MRC communication module
@@ -49,13 +47,13 @@ int MRC_Com_Init(MRC_Com_t *mrc_com, UART_HandleTypeDef *huart, uint8_t id)
     mrc_com->fbk_msg.mode = FREE;
     mrc_com->fbk_msg.collision_flag = 0;
     mrc_com->fbk_msg.encoder_value = 0;
-    mrc_com->fbk_msg.present_torque = 0;
+    mrc_com->fbk_msg.present_current = 0;
     mrc_com->fbk_msg.CRC16Data = 0;
 
     __HAL_UART_ENABLE_IT(mrc_com->mrc_huart, UART_IT_IDLE);
     
     // Start DMA reception for command messages
-    HAL_UART_Receive_DMA(mrc_com->mrc_huart, mrc_com->cmd_msg_buffer, MRC_CMD_SIZE);
+    HAL_UART_Receive_DMA(mrc_com->mrc_huart, mrc_com->cmd_msg_buffer, mrc_com->RxLen);
     
     return 0;
 }
@@ -72,7 +70,7 @@ int MRC_Com_UnpackCmd(MRC_Com_t *mrc_com)
     } 
     // Verify CRC checksum
     uint16_t received_crc = mrc_com->cmd_msg.CRC16Data;
-    uint16_t calculated_crc = crc_ccitt(0xFFFF, (uint8_t*)&mrc_com->cmd_msg, sizeof(MRC_Cmd_Protocol) - 2);
+    uint16_t calculated_crc = crc_ccitt(0xFFFF, (uint8_t*)&mrc_com->cmd_msg, mrc_com->RxLen - 2);
     // printf("received_crc: %x, calculated_crc: %x\n", received_crc, calculated_crc);
     if(received_crc == calculated_crc)
     {
@@ -81,7 +79,7 @@ int MRC_Com_UnpackCmd(MRC_Com_t *mrc_com)
     else
     {
         mrc_com->cmd_correct = 0;
-        memset((uint8_t*)&mrc_com->cmd_msg, 0, sizeof(mrc_com->cmd_msg));
+        memset((uint8_t*)&mrc_com->cmd_msg, 0, mrc_com->RxLen);
         printf("CRC mismatch!\n");
         return -1;
     }
@@ -94,12 +92,12 @@ int MRC_Com_UnpackCmd(MRC_Com_t *mrc_com)
  * @param mrc_com: MRC communication structure pointer
  * @param mode: Current work mode
  * @param encoder_value: Encoder angle value
- * @param present_torque: Current torque value
+ * @param present_current: Current torque value
  * @param collision_flag: Collision flag
  * @return 0: Success, -1: Failure
  */
 int MRC_Com_PackFbk(MRC_Com_t *mrc_com, MRC_Mode mode, uint32_t encoder_value, 
-                    uint16_t present_torque, uint8_t collision_flag)
+                    uint16_t present_current, uint8_t collision_flag)
 {
     if (mrc_com == NULL) {
         return -1;
@@ -111,11 +109,11 @@ int MRC_Com_PackFbk(MRC_Com_t *mrc_com, MRC_Mode mode, uint32_t encoder_value,
     mrc_com->fbk_msg.id = mrc_com->id;
     mrc_com->fbk_msg.mode = mode;
     mrc_com->fbk_msg.encoder_value = encoder_value;
-    mrc_com->fbk_msg.present_torque = present_torque;
+    mrc_com->fbk_msg.present_current = present_current;
     mrc_com->fbk_msg.collision_flag = collision_flag;
     
     // Calculate and add CRC checksum
-    mrc_com->fbk_msg.CRC16Data = crc_ccitt(0xFFFF, (uint8_t*)&mrc_com->fbk_msg, sizeof(MRC_Fbk_Protocol) - 2);
+    mrc_com->fbk_msg.CRC16Data = crc_ccitt(0xFFFF, (uint8_t*)&mrc_com->fbk_msg, mrc_com->TxLen - 2);
     
     return 0;
 }
@@ -134,7 +132,7 @@ int MRC_Com_SendFbk(MRC_Com_t *mrc_com)
     // Send feedback data using DMA
     HAL_StatusTypeDef status = HAL_UART_Transmit_DMA(mrc_com->mrc_huart, 
                                                     (uint8_t*)&mrc_com->fbk_msg, 
-                                                    sizeof(MRC_Fbk_Protocol));
+                                                    mrc_com->TxLen);
     
     return (status == HAL_OK) ? 0 : -1;
 }
@@ -168,9 +166,9 @@ void MRC_Com_Reset(MRC_Com_t *mrc_com)
     mrc_com->cmd_correct = 0;
     
     // Clear the receive buffer
-    memset((uint8_t*)&mrc_com->cmd_msg, 0, sizeof(mrc_com->cmd_msg));
+    memset((uint8_t*)&mrc_com->cmd_msg, 0, mrc_com->RxLen);
     
     // Restart DMA reception
-    HAL_UART_Receive_DMA(mrc_com->mrc_huart, mrc_com->cmd_msg_buffer, MRC_CMD_SIZE);
+    HAL_UART_Receive_DMA(mrc_com->mrc_huart, mrc_com->cmd_msg_buffer, mrc_com->RxLen);
 }
 

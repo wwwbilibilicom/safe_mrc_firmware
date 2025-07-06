@@ -10,6 +10,8 @@
 "safemrc\drv_vnh7040.o"
 "safemrc\kth78xx.o"
 "safemrc\mrc_com.o"
+"safemrc\mrc_debugcli.o"
+"safemrc\mrc_statemachine.o"
 "safemrc\main.o"
 "safemrc\gpio.o"
 "safemrc\adc.o"
@@ -46,6 +48,7 @@
 "safemrc\system_stm32h7xx.o"
 "safemrc\pid_controller.o"
 "safemrc\filter.o"
+"safemrc\sys_clock.o"
 --library_type=microlib --strict --scatter "safeMRC\safeMRC.sct"
 --summary_stderr --info summarysizes --map --xref --callgraph --symbols
 --info sizes --info totals --info unused --info veneers
