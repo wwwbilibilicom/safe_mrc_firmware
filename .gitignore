@@ -1,6 +1,6 @@
 MDK-ARM/safeMRC
-MDK-ARM\.vscode
+MDK-ARM/.vscode
 .vscode
-scripts\__pycache__
-scripts\build
-scritps\data
+scripts/__pycache__
+scripts/build
+scritps/data
