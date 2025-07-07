@@ -30,6 +30,12 @@ static uint8_t KTH78_SPI_TransmitReceiveBytes(SPI_HandleTypeDef *hspi, uint8_t *
     return HAL_OK;
 }
 
+void KTH78_SPI_TransmitReceiveBytes_WithoutWait(SPI_HandleTypeDef *hspi, uint8_t *pTxData, uint8_t *pRxData, uint16_t Size)
+{
+    HAL_GPIO_WritePin(SPI4_NSS_GPIO_Port, SPI4_NSS_Pin, GPIO_PIN_RESET);
+    HAL_SPI_TransmitReceive_DMA(hspi, pTxData, pRxData, 2);
+}
+
 //读取角度值
 float KTH78_ReadAngle(void)
 {
@@ -42,6 +48,16 @@ float KTH78_ReadAngle(void)
   KTH78_SPI_TransmitReceiveBytes(&hspi4, cmd, databack, 2);
 
   return (float)(((databack[0] << 8) + databack[1]) * 360.0f/65536.0f);
+}
+
+void KTH78_ExchangeData_WithoutWait(uint8_t *databack)
+{
+  uint8_t cmd[2];
+
+  cmd[0] = KTH78_READ_ANGLE;
+  cmd[1] = KTH78_NON_DATA;
+
+  KTH78_SPI_TransmitReceiveBytes_WithoutWait(&hspi4, cmd, databack, 2);
 }
 
 //读取寄存器数据

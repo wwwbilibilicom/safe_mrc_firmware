@@ -19,7 +19,8 @@ float KTH78_ReadAngle(void);
 uint8_t KTH78_ReadReg(uint8_t addr);
 uint8_t KTH78_WriteReg(uint8_t addr, uint8_t data);
 uint8_t KTH78_WriteMTP(uint8_t addr, uint8_t data);
-
+void KTH78_SPI_TransmitReceiveBytes_WithoutWait(SPI_HandleTypeDef *hspi, uint8_t *pTxData, uint8_t *pRxData, uint16_t Size);
+void KTH78_ExchangeData_WithoutWait(uint8_t *databack);
 #ifdef __cplusplus
 }
 #endif

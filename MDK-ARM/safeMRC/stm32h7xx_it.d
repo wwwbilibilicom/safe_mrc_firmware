@@ -52,6 +52,7 @@ safemrc\stm32h7xx_it.o: ../Device/Inc/drv_encoder.h
 safemrc\stm32h7xx_it.o: ../Common/Inc/filter.h
 safemrc\stm32h7xx_it.o: ../Device/Inc/stdint.h
 safemrc\stm32h7xx_it.o: ../Common/Inc/sys_clock.h
+safemrc\stm32h7xx_it.o: ../Device/Inc/kth78xx.h
 safemrc\stm32h7xx_it.o: ../Device/Inc/mrc_com.h
 safemrc\stm32h7xx_it.o: ../Device/Inc/mrc_protocol.h
 safemrc\stm32h7xx_it.o: ../Device/Inc/drv_vnh7040.h

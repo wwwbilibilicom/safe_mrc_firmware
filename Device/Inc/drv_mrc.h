@@ -48,7 +48,10 @@ typedef enum {
     typedef struct Device_MRC_t
     {
         MRC_State state_phase; // state_phase of the MR device
-        uint8_t collision_flag; // 1 bytes 0x00: safely, 0x01: collision happened.
+
+        float collision_threshold; // collision_threshold of the MR device
+        uint8_t COLLISION_REACT_FLAG;            // flag to execute collision reaction
+        
         MRC_Com_t com; // communication structure for the MRC device
 
         device_led_t LED1;
@@ -65,7 +68,6 @@ typedef enum {
         uint8_t State_Update_Flag;               // Flag to update the state_phase
         uint8_t demagnetization_counter;         // Counter for demagnetization
         uint8_t magnetization_counter;
-        uint8_t COLLISION_REACT_FLAG;            // flag to execute collision reaction
         uint8_t control_loop_flag;               // flag to execute control loop
 
         ADC_HandleTypeDef *ADC_handle; // ADC handle for the MRC device
@@ -111,7 +113,7 @@ typedef enum {
      * 
      * @note Detect collision by comparing states of the MRC device
      */
-    void MRC_collision_detect(Device_MRC_t *MRC, float param, float threshold);
+    void MRC_collision_detect(Device_MRC_t *MRC);
     
     /**
      * @brief MRC communication process using new mrc_com module
@@ -165,8 +167,10 @@ typedef enum {
      * @param L_coil Coil inductance (H, e.g. 0.0014868)
      * @param Ts Sample time (s)
      * @return PWM duty cycle (0~1)
-     */
+    */
     float MRC_CoilCurrentControl_Update(Device_MRC_t *MRC);
+
+    int8_t MRC_SetMode(Device_MRC_t *mrc, MRC_Mode mode);
 
 /**
  * @brief Lookup table entry for target-to-measured voltage compensation

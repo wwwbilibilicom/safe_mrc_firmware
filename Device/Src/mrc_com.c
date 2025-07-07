@@ -67,7 +67,7 @@ int MRC_Com_UnpackCmd(MRC_Com_t *mrc_com)
 {
     if (mrc_com == NULL) {
         return -1;
-    } 
+    }
     // Verify CRC checksum
     uint16_t received_crc = mrc_com->cmd_msg.CRC16Data;
     uint16_t calculated_crc = crc_ccitt(0xFFFF, (uint8_t*)&mrc_com->cmd_msg, mrc_com->RxLen - 2);
@@ -96,8 +96,8 @@ int MRC_Com_UnpackCmd(MRC_Com_t *mrc_com)
  * @param collision_flag: Collision flag
  * @return 0: Success, -1: Failure
  */
-int MRC_Com_PackFbk(MRC_Com_t *mrc_com, MRC_Mode mode, uint32_t encoder_value, 
-                    uint16_t present_current, uint8_t collision_flag)
+int MRC_Com_PackFbk(MRC_Com_t *mrc_com, MRC_Mode mode, int32_t encoder_value, int32_t encoder_velocity,
+    int32_t present_current, uint8_t collision_flag)
 {
     if (mrc_com == NULL) {
         return -1;
@@ -109,6 +109,7 @@ int MRC_Com_PackFbk(MRC_Com_t *mrc_com, MRC_Mode mode, uint32_t encoder_value,
     mrc_com->fbk_msg.id = mrc_com->id;
     mrc_com->fbk_msg.mode = mode;
     mrc_com->fbk_msg.encoder_value = encoder_value;
+    mrc_com->fbk_msg.encoder_velocity = encoder_velocity;
     mrc_com->fbk_msg.present_current = present_current;
     mrc_com->fbk_msg.collision_flag = collision_flag;
     

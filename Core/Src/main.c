@@ -20,6 +20,7 @@
 #include "main.h"
 #include "adc.h"
 #include "dma.h"
+#include "memorymap.h"
 #include "spi.h"
 #include "tim.h"
 #include "usart.h"
@@ -110,6 +111,7 @@ int main(void)
   MX_UART4_Init();
   MX_TIM7_Init();
   MX_SPI4_Init();
+  MX_TIM13_Init();
   /* USER CODE BEGIN 2 */
   MRC_Init((uint8_t *)"MRC", &MRC, 1);
   // 初始化UART4调试指令集
@@ -142,10 +144,13 @@ int main(void)
       }
     if(MRC.coil_current_update_flag == 1) // 10kHZ coil current update
     {
-      if(MRC.Encoder.Encoder_Duty.CapFlag == 1)
-      {
-        Encoder_Calibrate_n_Filter(&MRC.Encoder);
-      }
+      // if(MRC.Encoder.Encoder_Duty.CapFlag == 1)
+      // {
+      //   Encoder_Calibrate_n_Filter(&MRC.Encoder);
+      // }
+      
+      Encoder_Calibrate_n_Filter(&MRC.Encoder);
+      MRC_collision_detect(&MRC);
       MRC.filtered_coil_current = MRC_Update_Coil_Current(&MRC);
       MRC.coil_current_update_flag = 0;
     }
@@ -168,11 +173,6 @@ void SystemClock_Config(void)
 
   /** Configure the main internal regulator output voltage
   */
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
-
-  while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
-
-  __HAL_RCC_SYSCFG_CLK_ENABLE();
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE0);
 
   while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}

@@ -47,5 +47,5 @@ safemrc\drv_encoder.o: ../Device/Inc/drv_encoder.h
 safemrc\drv_encoder.o: ../Common/Inc/filter.h
 safemrc\drv_encoder.o: ../Device/Inc/stdint.h
 safemrc\drv_encoder.o: ../Common/Inc/sys_clock.h
-safemrc\drv_encoder.o: ../Core/Inc/tim.h
 safemrc\drv_encoder.o: ../Device/Inc/kth78xx.h
+safemrc\drv_encoder.o: ../Core/Inc/tim.h

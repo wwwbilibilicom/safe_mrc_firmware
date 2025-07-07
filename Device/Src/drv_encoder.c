@@ -21,21 +21,33 @@ int drv_encoder_init(Device_encoder_t *Encoder_dev, TIM_HandleTypeDef *Encoder_t
     Encoder_dev->htim = Encoder_tim;
     Encoder_dev->Channel = Encoder_ch;
     FirstOrder_KalmanFilter_Init(&(Encoder_dev->Encoder_KF), 0.001f, 0.033f);
-    SimpleLowPassFilter_InitByCutoff(&Encoder_dev->lowPassFilter, 10000.0f, 1000.0f); // the frequency of pwm is 66kHz, which means the sample frequency is 66kHz
-    // moving_average_create(&(Encoder_dev->movingAverage), 100, 1);
-    BandPassFilter_Init(30.0f, 150.0f, 1000.0f, &(Encoder_dev->bandPassFilter));
+    SimpleLowPassFilter_InitByCutoff(&Encoder_dev->lowPassFilter, 10000.0f, 100.0f); // the frequency of pwm is 66kHz, which means the sample frequency is 66kHz
+    moving_average_create(&(Encoder_dev->movingAverage), 100, 1);
+    BandPassFilter_Init(30.0f, 130.0f, 10000.0f, &(Encoder_dev->bandPassFilter));
     Encoder_dev->Encoder_Duty.CapIndex = First_Rrising;
     Encoder_dev->Encoder_Duty.CapFlag = 0;
     // HAL_TIM_IC_Start_IT(Encoder_dev->htim, Encoder_dev->Channel); // Start the timer interrupt for input capture
-    Encoder_PWM_Start_ReadAngle(Encoder_dev);
-    Encoder_CalibrateZero(Encoder_dev);
+    // Encoder_PWM_Start_ReadAngle(Encoder_dev);
+    // Encoder_PWM_CalibrateZero(Encoder_dev);
+
+    Encoder_SPI_CalibrateZero(Encoder_dev);
 
     printf("Encoder initialized successfully!\n");
     return 1;
 }
 
+static void Encoder_SPI_CalibrateZero(Device_encoder_t *Encoder_dev) {
+    float sum = 0;
+    for (int i = 0; i < 1000; ++i) {
+        Encoder_SPI_ReadAngle_WithWait(Encoder_dev);
+        sum += Encoder_dev->raw_angle;
+    }
+    Encoder_dev->zero_offset = sum / 1000.0f;
+    Encoder_dev->round_count = 0;
+    Encoder_dev->raw_continuous_angle = 0;
+}
 
-static void Encoder_CalibrateZero(Device_encoder_t *Encoder_dev) {
+void Encoder_PWM_CalibrateZero(Device_encoder_t *Encoder_dev) {
     float sum = 0;
     for (int i = 0; i < 1000; ++i) {
         while (Encoder_dev->Encoder_Duty.CapFlag == 0)
@@ -86,10 +98,10 @@ void CaptureDutyCycle(Device_encoder_t *Encoder_dev)
         HAL_TIM_IC_Stop_IT(Encoder_dev->htim, Encoder_dev->Channel);
         Encoder_dev->Encoder_Duty.CapIndex = First_Rrising;
         Encoder_dev->Encoder_Duty.CapFlag = 1;
-        // uint64_t last_capture_time = Encoder_dev->CurrentTime;
-        Encoder_dev->PreviousTime = Encoder_dev->CurrentTime;
-        Encoder_dev->CurrentTime = getHighResTime_ns();
-        // uint64_t deltaTime_ns = Encoder_dev->CurrentTime - last_capture_time;
+        // uint64_t last_capture_time = Encoder_dev->CurrentSampleTime;
+        Encoder_dev->PreviousSampleTime = Encoder_dev->CurrentSampleTime;
+        Encoder_dev->CurrentSampleTime = getHighResTime_ns();
+        // uint64_t deltaTime_ns = Encoder_dev->CurrentSampleTime - last_capture_time;
         // if (deltaTime_ns > 0) {
         //     Encoder_dev->real_freq = 1/(deltaTime_ns  * 1e-9f);
         // } else {
@@ -111,8 +123,19 @@ void CaptureDutyCycle(Device_encoder_t *Encoder_dev)
  * @note Suitable for encoder chips that support SPI communication, such as KTH78xx series
  * @note Directly read the raw angle value from the encoder chip
  */
-void Encoder_SPI_ReadAngle(Device_encoder_t *Encoder_dev){
+void Encoder_SPI_ReadAngle_WithWait(Device_encoder_t *Encoder_dev){
+    Encoder_dev->previous_raw_angle = Encoder_dev->raw_angle;
+    Encoder_dev->PreviousSampleTime = Encoder_dev->CurrentSampleTime;
     Encoder_dev->raw_angle = KTH78_ReadAngle();
+    Encoder_dev->CurrentSampleTime = getHighResTime_ns();
+}
+void Encoder_SPI_ReadAngle_WithoutWait(Device_encoder_t *Encoder_dev){
+    Encoder_dev->raw_angle = (float)(((Encoder_dev->spi_databack[0] << 8) + Encoder_dev->spi_databack[1]) * 360.0f/65536.0f);
+}
+
+void Encoder_SPI_ExchangeData(Device_encoder_t *Encoder_dev)
+{
+    KTH78_ExchangeData_WithoutWait(Encoder_dev->spi_databack);
 }
 
 void Encoder_PWM_Start_ReadAngle(Device_encoder_t *Encoder_dev){
@@ -134,8 +157,8 @@ static void Encoder_Calculate_From_Capture(Device_encoder_t *Encoder_dev){
     uint32_t period, high_time;
 
     // record the time of this sample
-    // Encoder_dev->PreviousTime = Encoder_dev->CurrentTime;
-    //Encoder_dev->CurrentTime = getHighResTime_ns();
+    // Encoder_dev->PreviousSampleTime = Encoder_dev->CurrentSampleTime;
+    //Encoder_dev->CurrentSampleTime = getHighResTime_ns();
 
     period = Encoder_dev->Encoder_Duty.CapVal[2];
     high_time = Encoder_dev->Encoder_Duty.CapVal[1];
@@ -177,7 +200,8 @@ static void Encoder_Calculate_From_Capture(Device_encoder_t *Encoder_dev){
  */
 void Encoder_Calibrate_n_Filter(Device_encoder_t *Encoder_dev)
 {
-    Encoder_Calculate_From_Capture(Encoder_dev);
+    // Encoder_Calculate_From_Capture(Encoder_dev);
+    Encoder_SPI_ReadAngle_WithWait(Encoder_dev);
 
     Encoder_UpdateContinuousAngle(Encoder_dev);
     
@@ -191,6 +215,7 @@ void Encoder_Calibrate_n_Filter(Device_encoder_t *Encoder_dev)
 
 
     CalAngularVelocity(Encoder_dev);
+    Encoder_dev->filtered_anguvel = BandPassFilter_Update(&Encoder_dev->bandPassFilter, Encoder_dev->AngularVelocity);
 }
 
 // Encoder parameters
@@ -199,15 +224,31 @@ void Encoder_Calibrate_n_Filter(Device_encoder_t *Encoder_dev)
 #define PI 3.14159f
 
 /**
- * @brief Calculate angular velocity
- * @param Encoder_dev Encoder device structure pointer
- * 
- * @note Calculate angular velocity based on encoder position change, unit is rad/s
- * @note Use differential method to calculate angular velocity, including angle jump handling
- * @note Sampling interval is 1ms to ensure calculation accuracy
+ * @brief Calculate the angular velocity of the encoder (rad/s)
+ *
+ * This function computes the angular velocity (speed of rotation) of the encoder in radians per second.
+ * It uses the difference between the current and previous encoder positions (in radians) and the time interval between samples (in nanoseconds).
+ * The function also handles the angle wrap-around (jump) at 0/360 degrees (i.e., 0/2π radians) to avoid spikes in the calculated speed.
+ *
+ * @param Encoder_dev Pointer to the encoder device structure (Device_encoder_t*), which must contain:
+ *   - CurrentEncoderValRad: Current filtered encoder angle in radians
+ *   - PreviousEncoderValRad: Previous filtered encoder angle in radians
+ *   - CurrentSampleTime: Current sample timestamp in nanoseconds
+ *   - PreviousSampleTime: Previous sample timestamp in nanoseconds
+ *   - AngularVelocity: Output, calculated angular velocity (rad/s)
+ *   - real_freq: Output, actual sampling frequency (Hz)
+ *
+ * @note
+ *   - The encoder angle values must be in radians.
+ *   - The time values must be in nanoseconds (ns).
+ *   - This function automatically handles angle wrap-around (e.g., from 359° to 0°) to prevent speed spikes.
+ *   - If the time interval is zero or negative, the output will be set to zero to avoid division by zero.
+ *
+ * Example usage:
+ *   CalAngularVelocity(&encoder);
  */
 void CalAngularVelocity(Device_encoder_t *Encoder_dev){
-    uint64_t deltaTime_ns=Encoder_dev->CurrentTime-Encoder_dev->PreviousTime;
+    uint64_t deltaTime_ns=Encoder_dev->CurrentSampleTime-Encoder_dev->PreviousSampleTime;
     float deltaEncoderValue=Encoder_dev->CurrentEncoderValRad-Encoder_dev->PreviousEncoderValRad;
     // 使用弧度单位处理跳变
     // float encoder_2pi = 2.0f * ENCODER_PI;

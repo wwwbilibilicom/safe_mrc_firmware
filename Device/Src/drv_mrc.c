@@ -29,6 +29,8 @@ uint32_t ADC_BUFFER[1]; // Buffer for ADC test
 #define COIL_PID_TS      0.001f
 #define COIL_PID_MAX_OUT 12.0f
 #define COIL_PID_MIN_OUT -12.0f
+//collison detection
+#define COLLISION_THRESHOLD 2.0f
 
 /**
  * @brief Initialize the MRC device
@@ -85,6 +87,7 @@ void MRC_Init(const uint8_t *dev_name, Device_MRC_t *MRC, uint8_t id)
     MRC->state_phase = Disengagement;
 
     MRC->COLLISION_REACT_FLAG = 0;  //collision react
+    MRC->collision_threshold = COLLISION_THRESHOLD; //collision threshold
 
     HAL_TIM_Base_Start_IT(&htim6); // timer for key
 
@@ -98,9 +101,11 @@ void MRC_Init(const uint8_t *dev_name, Device_MRC_t *MRC, uint8_t id)
 
     MRC->VNH7040.des_voltage = 0.0f; // Set the initial desired voltage to 0.0V
     MRC_set_voltage(MRC);
-    MRC_StateMachine_SetMode(&MRC->statemachine, FIX_LIMIT, MRC->filtered_coil_current);
+    MRC->control_mode = MRC_CURRENT_CONTROL;
+    // MRC_StateMachine_SetMode(&MRC->statemachine, FIX_LIMIT, MRC->filtered_coil_current);
+    MRC_SetMode(MRC, FIX_LIMIT);
 
-    led_on(&MRC->LED2); // Turn on LED1
+    led_on(&MRC->LED2); // Turn on LED2
     printf("Device MRC(%s) initialized successfully!\n", dev_name);
 
     MRC_StateMachine_Init(&MRC->statemachine);
@@ -157,12 +162,12 @@ void MRC_set_voltage(Device_MRC_t *MRC)
  *
  * If the COLLISION_REACT_FLAG is 1, it means a collision has already occurred. The function then checks if the absolute value of the param is less than the threshold. If it is, it means the collision has ended and the function calls the MRC_lock function to lock the MRC device, sets the COLLISION_REACT_FLAG to 0 to indicate that the collision has ended, and prints a message indicating that the collision has ended.
  */
-void MRC_collision_detect(Device_MRC_t *MRC, float param, float threshold)
+void MRC_collision_detect(Device_MRC_t *MRC)
 {
-    float index = fabsf(param);
+    float index = fabsf(MRC->Encoder.filtered_anguvel);
     if(!(MRC->COLLISION_REACT_FLAG))          // Non-collision state
     {
-        if(index < threshold)                   // Below threshold, no collision
+        if(index < MRC->collision_threshold)                   // Below threshold, no collision
         {
             return;
         }
@@ -177,7 +182,7 @@ void MRC_collision_detect(Device_MRC_t *MRC, float param, float threshold)
     }
     else if(MRC->COLLISION_REACT_FLAG)     // Collision state
     {
-        if(index >= threshold)                  // Above threshold, collision not ended
+        if(index >= index < MRC->collision_threshold)                  // Above threshold, collision not ended
         {
             return;
         }
@@ -192,6 +197,19 @@ void MRC_collision_detect(Device_MRC_t *MRC, float param, float threshold)
     }
 }
 
+int8_t MRC_SetMode(Device_MRC_t *mrc, MRC_Mode mode)
+{
+    if(mrc->COLLISION_REACT_FLAG == 0)
+    {
+        MRC_StateMachine_SetMode(&mrc->statemachine, mode, mrc->filtered_coil_current);
+        return 0;
+    }
+    else
+    {
+        return -1;
+    }
+}
+
 /**
  * @brief MRC communication process using new mrc_com module
  * @param MRC MRC device structure pointer
@@ -203,27 +221,32 @@ void MRC_Com_Process(Device_MRC_t *MRC)
 {
     // Check if new command received (RxFlag set by UART IDLE interrupt)
     if (MRC->com.RxFlag == 1) {
-        // Unpack and validate command message from DMA buffer
-        if (MRC_Com_UnpackCmd(&MRC->com) == 0) {
-            // Update device parameters from received command
-            if(MRC->statemachine.current_mode != DEBUG)
-            {
-                MRC_StateMachine_SetMode(&MRC->statemachine, MRC->com.cmd_msg.mode, MRC->filtered_coil_current);
-                if(MRC->com.cmd_msg.mode == FIX_LIMIT || MRC->com.cmd_msg.mode == ADAPTATION)
+        if(MRC->com.cmd_msg.id == MRC->com.id){
+
+            // Unpack and validate command message from DMA buffer
+            if (MRC_Com_UnpackCmd(&MRC->com) == 0) {
+                // Update device parameters from received command
+                if(MRC->statemachine.current_mode != DEBUG)
                 {
-                    MRC->des_coil_current = ((float)MRC->com.cmd_msg.des_coil_current) / 100.0f;
+                    // MRC_StateMachine_SetMode(&MRC->statemachine, MRC->com.cmd_msg.mode, MRC->filtered_coil_current);
+                    MRC_SetMode(MRC, MRC->com.cmd_msg.mode);
+                    if(MRC->com.cmd_msg.mode == FIX_LIMIT || MRC->com.cmd_msg.mode == ADAPTATION)
+                    {
+                        MRC->des_coil_current = ((float)MRC->com.cmd_msg.des_coil_current) / 1000.0f;
+                    }
                 }
-            }
-            
-            // Prepare feedback data
-            uint32_t encoder_value = (uint32_t)(MRC->Encoder.filtered_angle * 1000);
-            uint16_t present_current = (uint16_t)(MRC->filtered_coil_current * 1000); // Use actual voltage as torque indicator
-            uint8_t collision_flag = MRC->COLLISION_REACT_FLAG; // Use correct collision flag
-            
-            // Pack feedback message with current device status
-            if (MRC_Com_PackFbk(&MRC->com, MRC->statemachine.current_mode, encoder_value, present_current, collision_flag) == 0) {
-                // Send feedback response
-                MRC_Com_SendFbk(&MRC->com);
+                
+                // Prepare feedback data
+                int32_t encoder_value = (int32_t)(MRC->Encoder.CurrentEncoderValRad * 65535);
+                int32_t encoder_velocity = (int32_t)(MRC->Encoder.filtered_anguvel*1000);
+                int32_t present_current = (int32_t)(MRC->filtered_coil_current * 1000); // Use actual voltage as torque indicator
+                uint8_t collision_flag = MRC->COLLISION_REACT_FLAG; // Use correct collision flag
+                
+                // Pack feedback message with current device status
+                if (MRC_Com_PackFbk(&MRC->com, MRC->statemachine.current_mode, encoder_value, encoder_velocity, present_current, collision_flag) == 0) {
+                    // Send feedback response
+                    MRC_Com_SendFbk(&MRC->com);
+                }
             }
         }
         

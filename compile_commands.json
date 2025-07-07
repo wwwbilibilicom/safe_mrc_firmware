@@ -537,5 +537,566 @@
             "-o",
             "build/safeMRC/Common/Src/filter.o"
         ]
+    },
+    {
+        "directory": "MDK-ARM",
+        "file": "MDK-ARM/startup_stm32h750xx.s",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "MDK-ARM/startup_stm32h750xx.s",
+            "-o",
+            "build/safeMRC/MDK-ARM/startup_stm32h750xx.o"
+        ]
+    },
+    {
+        "directory": "Device/Src",
+        "file": "Device/Src/Array_user.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Device/Src/Array_user.c",
+            "-o",
+            "build/safeMRC/Device/Src/Array_user.o"
+        ]
+    },
+    {
+        "directory": "Device/Src",
+        "file": "Device/Src/crc_ccitt.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Device/Src/crc_ccitt.c",
+            "-o",
+            "build/safeMRC/Device/Src/crc_ccitt.o"
+        ]
+    },
+    {
+        "directory": "Device/Src",
+        "file": "Device/Src/drv_mrc.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Device/Src/drv_mrc.c",
+            "-o",
+            "build/safeMRC/Device/Src/drv_mrc.o"
+        ]
+    },
+    {
+        "directory": "Device/Src",
+        "file": "Device/Src/trajectory.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Device/Src/trajectory.c",
+            "-o",
+            "build/safeMRC/Device/Src/trajectory.o"
+        ]
+    },
+    {
+        "directory": "Device/Src",
+        "file": "Device/Src/drv_encoder.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Device/Src/drv_encoder.c",
+            "-o",
+            "build/safeMRC/Device/Src/drv_encoder.o"
+        ]
+    },
+    {
+        "directory": "Device/Src",
+        "file": "Device/Src/drv_key.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Device/Src/drv_key.c",
+            "-o",
+            "build/safeMRC/Device/Src/drv_key.o"
+        ]
+    },
+    {
+        "directory": "Device/Src",
+        "file": "Device/Src/drv_led.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Device/Src/drv_led.c",
+            "-o",
+            "build/safeMRC/Device/Src/drv_led.o"
+        ]
+    },
+    {
+        "directory": "Device/Src",
+        "file": "Device/Src/drv_vnh7040.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Device/Src/drv_vnh7040.c",
+            "-o",
+            "build/safeMRC/Device/Src/drv_vnh7040.o"
+        ]
+    },
+    {
+        "directory": "Device/Src",
+        "file": "Device/Src/kth78xx.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Device/Src/kth78xx.c",
+            "-o",
+            "build/safeMRC/Device/Src/kth78xx.o"
+        ]
+    },
+    {
+        "directory": "Device/Src",
+        "file": "Device/Src/mrc_com.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Device/Src/mrc_com.c",
+            "-o",
+            "build/safeMRC/Device/Src/mrc_com.o"
+        ]
+    },
+    {
+        "directory": "Device/Src",
+        "file": "Device/Src/mrc_debugcli.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Device/Src/mrc_debugcli.c",
+            "-o",
+            "build/safeMRC/Device/Src/mrc_debugcli.o"
+        ]
+    },
+    {
+        "directory": "Device/Src",
+        "file": "Device/Src/mrc_statemachine.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Device/Src/mrc_statemachine.c",
+            "-o",
+            "build/safeMRC/Device/Src/mrc_statemachine.o"
+        ]
+    },
+    {
+        "directory": "Core/Src",
+        "file": "Core/Src/main.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Core/Src/main.c",
+            "-o",
+            "build/safeMRC/Core/Src/main.o"
+        ]
+    },
+    {
+        "directory": "Core/Src",
+        "file": "Core/Src/gpio.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Core/Src/gpio.c",
+            "-o",
+            "build/safeMRC/Core/Src/gpio.o"
+        ]
+    },
+    {
+        "directory": "Core/Src",
+        "file": "Core/Src/adc.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Core/Src/adc.c",
+            "-o",
+            "build/safeMRC/Core/Src/adc.o"
+        ]
+    },
+    {
+        "directory": "Core/Src",
+        "file": "Core/Src/dma.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Core/Src/dma.c",
+            "-o",
+            "build/safeMRC/Core/Src/dma.o"
+        ]
+    },
+    {
+        "directory": "Core/Src",
+        "file": "Core/Src/memorymap.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Core/Src/memorymap.c",
+            "-o",
+            "build/safeMRC/Core/Src/memorymap.o"
+        ]
+    },
+    {
+        "directory": "Core/Src",
+        "file": "Core/Src/spi.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Core/Src/spi.c",
+            "-o",
+            "build/safeMRC/Core/Src/spi.o"
+        ]
+    },
+    {
+        "directory": "Core/Src",
+        "file": "Core/Src/tim.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Core/Src/tim.c",
+            "-o",
+            "build/safeMRC/Core/Src/tim.o"
+        ]
+    },
+    {
+        "directory": "Core/Src",
+        "file": "Core/Src/usart.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Core/Src/usart.c",
+            "-o",
+            "build/safeMRC/Core/Src/usart.o"
+        ]
+    },
+    {
+        "directory": "Core/Src",
+        "file": "Core/Src/stm32h7xx_it.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Core/Src/stm32h7xx_it.c",
+            "-o",
+            "build/safeMRC/Core/Src/stm32h7xx_it.o"
+        ]
+    },
+    {
+        "directory": "Core/Src",
+        "file": "Core/Src/stm32h7xx_hal_msp.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Core/Src/stm32h7xx_hal_msp.c",
+            "-o",
+            "build/safeMRC/Core/Src/stm32h7xx_hal_msp.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_adc.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_adc.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_adc.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_adc_ex.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_adc_ex.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_adc_ex.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_rcc.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_rcc.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_rcc.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_rcc_ex.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_rcc_ex.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_rcc_ex.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash_ex.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash_ex.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash_ex.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_gpio.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_gpio.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_gpio.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_hsem.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_hsem.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_hsem.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_dma.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_dma.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_dma.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_dma_ex.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_dma_ex.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_dma_ex.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_mdma.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_mdma.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_mdma.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_cortex.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_cortex.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_cortex.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_i2c.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_i2c.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_i2c.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_i2c_ex.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_i2c_ex.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_i2c_ex.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_exti.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_exti.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_exti.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_spi.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_spi.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_spi.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_spi_ex.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_spi_ex.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_spi_ex.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_tim.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_tim.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_tim.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_tim_ex.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_tim_ex.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_tim_ex.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_uart.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_uart.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_uart.o"
+        ]
+    },
+    {
+        "directory": "Drivers/STM32H7xx_HAL_Driver/Src",
+        "file": "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_uart_ex.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_uart_ex.c",
+            "-o",
+            "build/safeMRC/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_uart_ex.o"
+        ]
+    },
+    {
+        "directory": "Core/Src",
+        "file": "Core/Src/system_stm32h7xx.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Core/Src/system_stm32h7xx.c",
+            "-o",
+            "build/safeMRC/Core/Src/system_stm32h7xx.o"
+        ]
+    },
+    {
+        "directory": "Common/Src",
+        "file": "Common/Src/pid_controller.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Common/Src/pid_controller.c",
+            "-o",
+            "build/safeMRC/Common/Src/pid_controller.o"
+        ]
+    },
+    {
+        "directory": "Common/Src",
+        "file": "Common/Src/filter.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Common/Src/filter.c",
+            "-o",
+            "build/safeMRC/Common/Src/filter.o"
+        ]
+    },
+    {
+        "directory": "Common/Src",
+        "file": "Common/Src/sys_clock.c",
+        "arguments": [
+            "D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe",
+            "-c",
+            "Common/Src/sys_clock.c",
+            "-o",
+            "build/safeMRC/Common/Src/sys_clock.o"
+        ]
     }
 ]

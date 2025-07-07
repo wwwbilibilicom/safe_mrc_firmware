@@ -33,10 +33,12 @@ void MRC_DebugCLI_Parse(const char *cmd_str, Device_MRC_t *mrc) {
     // DEBUG ON/OFF commands
     if (strcmp(cmd, "DEBUG") == 0) {
         if (strcmp(arg1, "ON") == 0) {
-            MRC_StateMachine_SetMode(&mrc->statemachine, DEBUG, mrc->filtered_coil_current);
+            // MRC_StateMachine_SetMode(&mrc->statemachine, DEBUG, mrc->filtered_coil_current);
+            MRC_SetMode(mrc, DEBUG);
             printf("[USART1] DEBUG mode enabled.\n");
         } else if (strcmp(arg1, "OFF") == 0) {
-            MRC_StateMachine_SetMode(&mrc->statemachine, FIX_LIMIT, mrc->filtered_coil_current);
+            // MRC_StateMachine_SetMode(&mrc->statemachine, FIX_LIMIT, mrc->filtered_coil_current);
+            MRC_SetMode(mrc, FIX_LIMIT);
             mrc->control_mode = MRC_CURRENT_CONTROL;
             printf("[USART1] DEBUG mode disabled. Now in FIX_LIMIT mode.\n");
         } else {

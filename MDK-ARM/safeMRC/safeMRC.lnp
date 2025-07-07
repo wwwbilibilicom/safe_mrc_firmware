@@ -16,6 +16,7 @@
 "safemrc\gpio.o"
 "safemrc\adc.o"
 "safemrc\dma.o"
+"safemrc\memorymap.o"
 "safemrc\spi.o"
 "safemrc\tim.o"
 "safemrc\usart.o"

@@ -54,8 +54,8 @@ int MRC_Com_UnpackCmd(MRC_Com_t *mrc_com);
  * @param collision_flag: Collision flag
  * @return 0: Success, -1: Failure
  */
-int MRC_Com_PackFbk(MRC_Com_t *mrc_com, MRC_Mode mode, uint32_t encoder_value, 
-                    uint16_t present_currenttt, uint8_t collision_flag);
+int MRC_Com_PackFbk(MRC_Com_t *mrc_com, MRC_Mode mode, int32_t encoder_value, int32_t encoder_velocity,
+    int32_t present_current, uint8_t collision_flag);
 
 /**
  * @brief Send feedback data using DMA (device side response)

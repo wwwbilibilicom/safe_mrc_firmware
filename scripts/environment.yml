@@ -1,0 +1,9 @@
+name: safemrc_host
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9
+  - pyqt=5.*
+  - pyqtgraph
+  - pyserial
+  - numpy

@@ -12,6 +12,7 @@ CompileFlags:
     - '-Ig:/lab/project/MRF_Bearing_Lock/embeded_code/safe-MRC/Common/Inc'
     - '-DUSE_HAL_DRIVER'
     - '-DSTM32H750xx'
+    - '-DUSE_PWR_LDO_SUPPLY'
     - '-D__CC_ARM'
     - '-D__arm__'
     - '-D__align(x)='

@@ -141,17 +141,35 @@ safe-MRC/
 | 4-5        | Target Torque | 2            | Target torque, uint16, little-endian |
 | 6-7        | CRC-16-CCITT  | 2            | CRC of bytes 0-5, little-endian      |
 
-#### Feedback Message (Device → Host, 13 bytes)
+#### Feedback Message (Device → Host, 17 bytes)
 
-| Byte Index | Field Name     | Size (bytes) | Description                            |
-| ---------- | -------------- | ------------ | -------------------------------------- |
-| 0-1        | Header         | 2            | Frame header, fixed 0xFE, 0xEE         |
-| 2          | Device ID      | 1            | Responding device address              |
-| 3          | Mode           | 1            | Current work mode                      |
-| 4          | Collision Flag | 1            | 0: safe, 1: collision detected         |
-| 5-8        | Encoder Value  | 4            | Encoder reading, uint32, little-endian |
-| 9-10       | Present Torque | 2            | Current torque, uint16, little-endian  |
-| 11-12      | CRC-16-CCITT   | 2            | CRC of bytes 0-10, little-endian       |
+| Byte Index | Field Name        | Size (bytes) | Description                                 |
+| ---------- | ---------------- | ------------ | ------------------------------------------- |
+| 0-1        | Header           | 2            | Frame header, fixed 0xFE, 0xEE              |
+| 2          | Device ID        | 1            | Responding device address                   |
+| 3          | Mode             | 1            | Current work mode                           |
+| 4          | Collision Flag   | 1            | 0: safe, 1: collision detected              |
+| 5-8        | Encoder Value    | 4            | Encoder reading, int32, little-endian (deg*1000) |
+| 9-12       | Encoder Velocity | 4            | Encoder angular velocity, int32, little-endian (deg/s*1000) |
+| 13-14      | Present Current  | 2            | Current torque, int16, little-endian        |
+| 15-16      | CRC-16-CCITT     | 2            | CRC of bytes 0-14, little-endian            |
+
+**Note:** 反馈报文长度由13字节升级为17字节，增加了编码器速度字段，编码器角度和速度均为int32，单位分别为"度*1000"和"度/秒*1000"。
+
+#### SPI Encoder Angle Reading
+
+- **Supported Encoder:** KTH78xx series (or compatible SPI angle encoders)
+- **SPI Read Function:**
+  - `float KTH78_ReadAngle(void);`  // 直接读取角度，单位：度
+  - `void Encoder_SPI_ReadAngle_WithWait(Device_encoder_t *Encoder_dev);` // 读取并更新结构体
+  - `void Encoder_SPI_ExchangeData(Device_encoder_t *Encoder_dev);` // 交换数据（无等待）
+- **原理说明：**
+  - 通过SPI发送`KTH78_READ_ANGLE`命令，读取2字节原始数据，转换为0~360度的角度值。
+  - 支持阻塞和非阻塞两种读取方式。
+  - 读取到的角度会自动经过滤波和连续角度处理，最终用于反馈报文。
+- **结构体说明：**
+  - `Device_encoder_t`结构体包含SPI数据缓存、原始角度、连续角度、滤波角度、速度等信息。
+  - 相关成员：`raw_angle`（原始角度），`filtered_angle`（滤波后角度），`AngularVelocity`（角速度，rad/s），`spi_databack[2]`（SPI原始数据）。
 
 #### CRC-16-CCITT Calculation
 
@@ -159,7 +177,7 @@ safe-MRC/
 - **Initial Value**: 0xFFFF
 - **Input/Output Reflection**: None
 - **Final XOR**: None
-- **Range**: For command, CRC covers bytes 0-5; for feedback, CRC covers bytes 0-10
+- **Range**: For command, CRC covers bytes 0-5; for feedback, CRC covers bytes 0-14
 
 **Example (C code):**
 
@@ -179,7 +197,7 @@ uint16_t crc_ccitt(uint16_t crc, const uint8_t *data, size_t len);
 
 1. The host sends an 8-byte command frame to the RS-485 bus.
 2. The target device verifies the ID and CRC, then parses the command.
-3. The device replies with a 13-byte feedback frame containing its current status.
+3. The device replies with a 17-byte feedback frame containing its current status.
 4. The host verifies the feedback CRC and reads the status.
 
 #### Physical Layer Notes
@@ -221,9 +239,10 @@ while(1) {
 
 ## Reflection & Suggestions
 
-- **Documentation Sync**: Always update README after code changes, especially for LUT, parameters, and interfaces.
+- **Documentation Sync**: Always update README after code changes, especially for LUT, parameters, interfaces, and communication protocol (如反馈报文结构变更、SPI读取方式变更等)。
 - **Configurable Parameters**: Consider making PI parameters and LUT updatable via communication protocol in the future.
 - **Comments & Examples**: Keep Doxygen-style comments and provide simple usage examples for beginners.
+- **SPI Encoder Support**: 建议后续支持更多类型的SPI编码器，并在文档中持续完善相关说明和使用示例。
 
 ---
 
@@ -425,3 +444,36 @@ You can send string commands via UART4 (baud rate 921600) to switch control mode
 - Only the four commands above are supported. Any other input will result in an "Unknown command" message.
 - The CLI is initialized in `main.c` and does not require manual activation.
 - Using the CLI does not affect the main communication protocol or normal device operation.
+
+## 7. Host UI (PC Tool)
+
+A cross-platform Python GUI tool is provided in the `scripts/` directory for real-time communication, control, and data visualization with the SafeMRC embedded controller.
+
+### Main Features
+- Serial port auto-detection and high-speed communication (up to 4 Mbps)
+- Control panel for mode, frequency, current, and device ID
+- Real-time display of all feedback fields (angle, velocity, current, mode, collision flag, CRC, etc.)
+- Three-channel real-time plotting (angle, velocity, current) with adjustable time window
+- Data recording, export to CSV, and time axis reset
+- Robust multithreading for smooth UI experience
+- Hexadecimal TX/RX message display for protocol debugging
+
+### How to Use
+1. Install dependencies and launch the UI as described in `scripts/README.md`.
+2. Select the correct serial port and connect.
+3. Set control parameters and device ID as needed.
+4. Start/stop data recording, export CSV, and clear plots as required.
+
+### Data Export & Analysis
+- All feedback data (with high-precision timestamps) can be exported as CSV for offline analysis.
+- Time axis in exported data matches the UI plots for easy comparison.
+
+### Protocol Consistency
+- The host UI and embedded firmware use **identical communication protocols and CRC algorithms**.
+- Any protocol changes must be updated in both the embedded code and the UI tool to ensure compatibility.
+
+### Debugging & Troubleshooting
+- If the UI cannot connect, check serial port permissions, cable quality, and device power.
+- For high-speed operation, use a reliable USB-to-serial adapter.
+- If protocol errors occur, verify that both sides use the same baud rate, frame format, and CRC settings.
+- For further details, see the troubleshooting section in `scripts/README.md`.

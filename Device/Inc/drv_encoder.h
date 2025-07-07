@@ -60,14 +60,16 @@ extern "C"
         
         float CurrentEncoderValRad;  // Current encoder value in rad
         float PreviousEncoderValRad;// Previous encoder value in rad
-        uint64_t CurrentTime;
-        uint64_t PreviousTime;
+        uint64_t CurrentSampleTime;
+        uint64_t PreviousSampleTime;
         float AngularVelocity; // Angular velocity, rad/s
         float filtered_anguvel;
 
         BandPassFilter bandPassFilter;
         SimpleLowPassFilter lowPassFilter;
         movingAverage_t movingAverage;
+        
+        uint8_t spi_databack[2];
 
     } Device_encoder_t;
 #pragma pack()
@@ -83,7 +85,10 @@ extern "C"
      */
     int drv_encoder_init(Device_encoder_t *Encoder_dev, TIM_HandleTypeDef *Encoder_tim, uint32_t Encoder_ch);
 
-    static void Encoder_CalibrateZero(Device_encoder_t *Encoder_dev);
+    void Encoder_PWM_CalibrateZero(Device_encoder_t *Encoder_dev);
+
+    static void Encoder_SPI_CalibrateZero(Device_encoder_t *Encoder_dev);
+
     
     /**
      * @brief Get encoder position
@@ -128,9 +133,13 @@ extern "C"
      * 
      * @note Suitable for encoder chips that support SPI communication, such as KTH78xx series
      */
-    void Encoder_SPI_ReadAngle(Device_encoder_t *Encoder_dev);
+    void Encoder_SPI_ReadAngle_WithWait(Device_encoder_t *Encoder_dev);
 
     void Encoder_PWM_Start_ReadAngle(Device_encoder_t *Encoder_dev);
+
+    void Encoder_SPI_ReadAngle_WithoutWait(Device_encoder_t *Encoder_dev);
+
+    void Encoder_SPI_ExchangeData(Device_encoder_t *Encoder_dev);
 
 //    uint32_t getCurrentTime(void);
 //    uint64_t getHighResTime_ns(void);

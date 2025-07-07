@@ -52,6 +52,7 @@ safemrc\mrc_debugcli.o: ../Device/Inc/drv_encoder.h
 safemrc\mrc_debugcli.o: ../Common/Inc/filter.h
 safemrc\mrc_debugcli.o: ../Device/Inc/stdint.h
 safemrc\mrc_debugcli.o: ../Common/Inc/sys_clock.h
+safemrc\mrc_debugcli.o: ../Device/Inc/kth78xx.h
 safemrc\mrc_debugcli.o: ../Device/Inc/mrc_com.h
 safemrc\mrc_debugcli.o: ../Device/Inc/mrc_protocol.h
 safemrc\mrc_debugcli.o: ../Device/Inc/drv_vnh7040.h
