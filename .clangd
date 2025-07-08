@@ -1,15 +1,15 @@
 CompileFlags:
   Add:
-    - '--target=arm-none-eabi'
-    - '-I"d:/Program Files/Keil_v5/ARM/ARMCC/include"'
-    - '-I"d:/Program Files/Keil_v5/ARM/ARMCC/include/rw"'
-    - '-Ig:/lab/project/MRF_Bearing_Lock/embeded_code/safe-MRC/Core/Inc'
-    - '-Ig:/lab/project/MRF_Bearing_Lock/embeded_code/safe-MRC/Drivers/STM32H7xx_HAL_Driver/Inc'
-    - '-Ig:/lab/project/MRF_Bearing_Lock/embeded_code/safe-MRC/Drivers/STM32H7xx_HAL_Driver/Inc/Legacy'
-    - '-Ig:/lab/project/MRF_Bearing_Lock/embeded_code/safe-MRC/Drivers/CMSIS/Device/ST/STM32H7xx/Include'
-    - '-Ig:/lab/project/MRF_Bearing_Lock/embeded_code/safe-MRC/Drivers/CMSIS/Include'
-    - '-Ig:/lab/project/MRF_Bearing_Lock/embeded_code/safe-MRC/Device/Inc'
-    - '-Ig:/lab/project/MRF_Bearing_Lock/embeded_code/safe-MRC/Common/Inc'
+    - '-Ig:\lab\project\MRF_Bearing_Lock\embeded_code\safe-MRC/RTE/_safeMRC'
+    - '-ID:\Program Files\Keil_v5\ARM\ARMCC\include'
+    - '-ID:\Program Files\Keil_v5\ARM\ARMCC\include\rw'
+    - '-ICore\Inc'
+    - '-IDrivers\STM32H7xx_HAL_Driver\Inc'
+    - '-IDrivers\STM32H7xx_HAL_Driver\Inc\Legacy'
+    - '-IDrivers\CMSIS\Device\ST\STM32H7xx\Include'
+    - '-IDrivers\CMSIS\Include'
+    - '-IDevice\Inc'
+    - '-ICommon\Inc'
     - '-DUSE_HAL_DRIVER'
     - '-DSTM32H750xx'
     - '-DUSE_PWR_LDO_SUPPLY'
@@ -85,11 +85,4 @@ CompileFlags:
     - '-D__wfi()='
     - '-D__yield()='
     - '-D__vfp_status(x,y)=0'
-  Compiler: D:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe
-
-
----
-If:
-  PathMatch: */CMSIS/.*
-Diagnostics:
-  Suppress: ["*", undeclared_var_use_suggest]
+  Compiler: D:\Program Files\Keil_v5\ARM\ARMCC\bin\armcc.exe

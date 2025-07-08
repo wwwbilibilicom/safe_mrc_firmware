@@ -226,7 +226,7 @@ void MRC_Com_Process(Device_MRC_t *MRC)
             // Unpack and validate command message from DMA buffer
             if (MRC_Com_UnpackCmd(&MRC->com) == 0) {
                 // Update device parameters from received command
-                if(MRC->statemachine.current_mode != DEBUG)
+                if(MRC->statemachine.current_mode != DEBUG && MRC->COLLISION_REACT_FLAG == 0)
                 {
                     // MRC_StateMachine_SetMode(&MRC->statemachine, MRC->com.cmd_msg.mode, MRC->filtered_coil_current);
                     MRC_SetMode(MRC, MRC->com.cmd_msg.mode);
