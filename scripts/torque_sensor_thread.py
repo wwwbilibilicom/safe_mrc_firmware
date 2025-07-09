@@ -15,14 +15,13 @@ class TorqueSensorThread(QtCore.QThread):
         self.running = False
         self.ser = None
         self._stop_event = False
+        self._sampling = False  # 添加采样控制标志
         self.lock = QtCore.QMutex()
         self.expected_len = 8  # 期望的最小数据长度
         self.rx_buffer = b''
         
-        # 创建发送定时器，在run方法中启动
-        self.send_timer = QtCore.QTimer()
-        self.send_timer.moveToThread(self)
-        self.send_timer.timeout.connect(self.send_command)
+        # 创建发送定时器，但不要立即moveToThread，而是在run方法中创建
+        self.send_timer = None
 
     def configure(self, port, baudrate, freq):
         self.port = port
@@ -43,7 +42,11 @@ class TorqueSensorThread(QtCore.QThread):
             
             # 启动发送定时器，使用毫秒
             interval_ms = int(1000.0 / self.freq) if self.freq > 0 else 1
+            self.send_timer = QtCore.QTimer()
+            self.send_timer.moveToThread(self)
+            self.send_timer.timeout.connect(self.send_command)
             self.send_timer.start(interval_ms)
+            print(f"扭矩传感器: 发送定时器已启动，间隔 {interval_ms} ms")
             
             # 接收循环
             while not self._stop_event:
@@ -69,11 +72,13 @@ class TorqueSensorThread(QtCore.QThread):
 
     def send_command(self):
         """定时器触发的发送命令函数"""
-        if not self.running or not self.ser or not self.ser.is_open:
+        if not self._sampling or not self.running or not self.ser or not self.ser.is_open:
+            print(f"Torque sensor send_command: _sampling={self._sampling}, running={self.running}, ser={self.ser}, is_open={self.ser.is_open if self.ser else False}")
             return
         try:
             # 发送读取命令
             awake = bytes([0x01, 0x03, 0x00, 0x1E, 0x00, 0x02, 0xA4, 0x0D])
+            print(f"Torque sensor sending command: {' '.join(f'{b:02X}' for b in awake)}")
             self.ser.reset_input_buffer()
             self.ser.write(awake)
         except Exception as e:
@@ -112,7 +117,8 @@ class TorqueSensorThread(QtCore.QThread):
 
     def stop(self):
         self._stop_event = True
-        self.send_timer.stop()
+        if self.send_timer:
+            self.send_timer.stop()
         self.wait()
 
     def update_params(self, port=None, baudrate=None, freq=None):
@@ -128,6 +134,11 @@ class TorqueSensorThread(QtCore.QThread):
         if self.running and freq is not None:
             interval_ms = int(1000.0 / self.freq) if self.freq > 0 else 1
             self.send_timer.setInterval(interval_ms)
+    
+    def enable_sampling(self, enable):
+        """启用或禁用采样"""
+        with QtCore.QMutexLocker(self.lock):
+            self._sampling = enable
     
     @staticmethod
     def hex2dec(hex_data):

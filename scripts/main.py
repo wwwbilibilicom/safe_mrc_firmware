@@ -261,6 +261,7 @@ class MainWindow(QtWidgets.QMainWindow):
         mode = self.mode_combo.currentData()
         current = self.current_spin.value()
         device_id = self.id_spin.value()
+        print(f"SafeMRC: 连接到端口 {port}，波特率 {baudrate}，发送频率 {freq}Hz")
         self.serial_thread.configure(port, baudrate, send_interval, mode, current, device_id)
         try:
             self.serial_thread.start()
@@ -289,6 +290,7 @@ class MainWindow(QtWidgets.QMainWindow):
         port = self.torque_port_combo.currentText()
         baud = int(self.torque_baud_combo.currentText())
         freq = self.torque_freq_spin.value()
+        print(f"扭矩传感器: 连接到端口 {port}，波特率 {baud}，采样频率 {freq}Hz")
         self.torque_thread.configure(port, baud, freq)
         try:
             self.torque_thread.start()
@@ -515,9 +517,12 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         if self.start_btn.isChecked():
             self.start_btn.setText('Stop Sending')
+            print("SafeMRC: 启用发送，当前模式:", self.MODES.get(self.mode_combo.currentData(), "未知"))
+            print(f"SafeMRC: 当前参数 - 频率:{self.freq_spin.value()}Hz, 电流:{self.current_spin.value()}A, ID:{self.id_spin.value()}")
             self.serial_thread.enable_sending(True)
         else:
             self.start_btn.setText('Start Sending')
+            print("SafeMRC: 禁用发送")
             self.serial_thread.enable_sending(False)
 
     def append_hex_log(self, direction, frame_bytes):
@@ -580,17 +585,22 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def start_torque_sampling(self):
         if not self.torque_connected:
+            print("扭矩传感器未连接，无法启动采样")
             return
         if self.torque_plot_curve is None:
             QtWidgets.QMessageBox.warning(self, 'Warning', 'Torque plot window not ready, please wait for UI to load.')
             return
         if not self.torque_thread.isRunning():
+            print("扭矩传感器线程未运行，正在启动...")
             self.torque_thread._stop_event = False
             self.torque_thread.start()
+        print("扭矩传感器: 启用采样")
+        self.torque_thread.enable_sampling(True)  # 启用采样
         self.torque_start_btn.setEnabled(False)
         self.torque_stop_btn.setEnabled(True)
 
     def stop_torque_sampling(self):
+        self.torque_thread.enable_sampling(False)  # 禁用采样
         if self.torque_thread.isRunning():
             self.torque_thread.stop()
         self.torque_start_btn.setEnabled(True)

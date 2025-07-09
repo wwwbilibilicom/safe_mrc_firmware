@@ -63,10 +63,8 @@ class SerialThread(QtCore.QThread):
         self._last_cmd = b''
         self.rx_buffer = b''
         
-        # 创建发送定时器，在run方法中启动
-        self.send_timer = QtCore.QTimer()
-        self.send_timer.moveToThread(self)
-        self.send_timer.timeout.connect(self.send_command)
+        # 创建发送定时器，但不要立即moveToThread，而是在run方法中创建
+        self.send_timer = None
 
     def configure(self, port, baudrate, send_interval, mode, current, device_id):
         self.port = port
@@ -85,7 +83,11 @@ class SerialThread(QtCore.QThread):
             
             # 启动发送定时器，使用毫秒
             interval_ms = int(self.send_interval * 1000)
+            self.send_timer = QtCore.QTimer()
+            self.send_timer.moveToThread(self)
+            self.send_timer.timeout.connect(self.send_command)
             self.send_timer.start(interval_ms)
+            print(f"SafeMRC: 发送定时器已启动，间隔 {interval_ms} ms")
             
             # 接收循环
             while not self._stop_event:
@@ -113,6 +115,7 @@ class SerialThread(QtCore.QThread):
     def send_command(self):
         """定时器触发的发送命令函数"""
         if not self._sending or not self.running:
+            print(f"SafeMRC send_command: _sending={self._sending}, running={self.running}")
             return
         try:
             with QtCore.QMutexLocker(self.lock):
@@ -120,9 +123,12 @@ class SerialThread(QtCore.QThread):
                 self._last_cmd = cmd
             
             if self.ser and self.ser.is_open:
+                print(f"SafeMRC sending command: {' '.join(f'{b:02X}' for b in cmd)}")
                 self.ser.write(cmd)
                 # 发送信号通知UI
                 self.data_received.emit({'raw_frame': cmd, 'direction': 'TX'})
+            else:
+                print(f"SafeMRC serial not open: ser={self.ser}, is_open={self.ser.is_open if self.ser else False}")
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -162,7 +168,8 @@ class SerialThread(QtCore.QThread):
 
     def stop(self):
         self._stop_event = True
-        self.send_timer.stop()
+        if self.send_timer:
+            self.send_timer.stop()
         self.wait()
 
     def update_params(self, send_interval, mode, current, device_id):
