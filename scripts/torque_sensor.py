@@ -1,6 +1,7 @@
 import serial
 import time
 import threading
+import serial.tools.list_ports
 
 class TorqueSensor:
     def __init__(self):
@@ -65,6 +66,10 @@ class TorqueSensor:
         if self.serial and self.serial.is_open:
             self.serial.close()
         self.initialized = False
+
+    @staticmethod
+    def get_available_ports():
+        return [p.device for p in serial.tools.list_ports.comports()]
 
     @staticmethod
     def hex2dec(hex_data):

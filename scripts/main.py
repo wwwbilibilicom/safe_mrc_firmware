@@ -9,26 +9,33 @@ from PyQt5 import QtWidgets, QtCore
 import pyqtgraph as pg
 from PyQt5.QtGui import QTextCursor
 import csv
-from PyQt5.QtWidgets import QFileDialog, QLabel
+from PyQt5.QtWidgets import QFileDialog, QLabel, QComboBox, QLineEdit, QPushButton, QHBoxLayout, QVBoxLayout, QGroupBox, QSpinBox, QDoubleSpinBox
 from safemrc_comm import SerialThread
+from torque_sensor import TorqueSensor
 
 # -----------------------------
 # Main Application Window
 # -----------------------------
 class MainWindow(QtWidgets.QMainWindow):
     MODES = {0: 'FREE', 1: 'FIX_LIMIT', 2: 'ADAPTATION', 3: 'DEBUG'}
+    COMMON_BAUDRATES = [9600, 19200, 38400, 57600, 115200]
     def __init__(self):
         super().__init__()
         self.setWindowTitle('SafeMRC Host UI')
-        self.resize(1000, 700)
+        self.resize(1200, 700)
         self.serial_thread = SerialThread()
         self.serial_thread.data_received.connect(self.on_data_received)
         self.serial_thread.status_changed.connect(self.on_status_changed)
         self.serial_thread.error_signal.connect(self.show_serial_error)
+        # Torque sensor
+        self.torque_sensor = TorqueSensor()
+        self.torque_connected = False
+        self.torque_value = 0.0
+        self.torque_lock = QtCore.QMutex()
         self._setup_ui()
         self._init_data_buffers()
         self.timer = QtCore.QTimer()
-        self.timer.timeout.connect(self.update_plots)
+        self.timer.timeout.connect(self.update_all)
         self.timer.start(30)
         self.connected = False
         self.last_data_time = time.time()
@@ -36,7 +43,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _setup_ui(self):
         central = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(central)
-        # Top row: Serial port selection and connect/disconnect
+        # Top row: SafeMRC Serial port selection and connect/disconnect
         top_row = QtWidgets.QHBoxLayout()
         self.port_combo = QtWidgets.QComboBox()
         self.refresh_btn = QtWidgets.QPushButton('Refresh')
@@ -55,9 +62,39 @@ class MainWindow(QtWidgets.QMainWindow):
         top_row.addWidget(self.disconnect_btn)
         top_row.addWidget(self.start_btn)
         top_row.addWidget(QtWidgets.QLabel('Serial Port:'))
+        self.port_combo.setMinimumWidth(80)
         top_row.addWidget(self.port_combo)
         top_row.addWidget(self.refresh_btn)
         top_row.addStretch()
+        # --- Torque Sensor UI ---
+        torque_group = QGroupBox('Torque Sensor')
+        torque_layout = QHBoxLayout()
+        self.torque_port_combo = QComboBox()
+        self.torque_refresh_btn = QPushButton('Refresh')
+        self.torque_refresh_btn.clicked.connect(self.refresh_torque_ports)
+        self.refresh_torque_ports()
+        self.torque_baud_combo = QComboBox()
+        for b in self.COMMON_BAUDRATES:
+            self.torque_baud_combo.addItem(str(b))
+        self.torque_baud_combo.setEditable(True)
+        self.torque_baud_combo.setCurrentText('115200')
+        self.torque_connect_btn = QPushButton('Connect')
+        self.torque_disconnect_btn = QPushButton('Disconnect')
+        self.torque_disconnect_btn.setEnabled(False)
+        self.torque_connect_btn.clicked.connect(self.connect_torque_sensor)
+        self.torque_disconnect_btn.clicked.connect(self.disconnect_torque_sensor)
+        self.torque_val_label = QLabel('Torque: -- Nm')
+        torque_layout.addWidget(QLabel('Port:'))
+        torque_layout.addWidget(self.torque_port_combo)
+        torque_layout.addWidget(self.torque_refresh_btn)
+        torque_layout.addWidget(QLabel('Baudrate:'))
+        torque_layout.addWidget(self.torque_baud_combo)
+        torque_layout.addWidget(self.torque_connect_btn)
+        torque_layout.addWidget(self.torque_disconnect_btn)
+        torque_layout.addWidget(self.torque_val_label)
+        torque_layout.addStretch()
+        torque_group.setLayout(torque_layout)
+        top_row.addWidget(torque_group)
         layout.addLayout(top_row)
         # Add hex log display below serial row
         self.hex_log = QtWidgets.QTextEdit()
@@ -108,7 +145,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.plot_window_spin.setRange(1, 30)
         self.plot_window_spin.setValue(1)
         plot_ctrl_row.addWidget(self.plot_window_spin)
-        # Add clear plots button
         self.clear_plots_btn = QtWidgets.QPushButton('Clear Plots')
         self.clear_plots_btn.clicked.connect(self.clear_plots)
         plot_ctrl_row.addWidget(self.clear_plots_btn)
@@ -118,8 +154,8 @@ class MainWindow(QtWidgets.QMainWindow):
         plot_layout = QtWidgets.QHBoxLayout()
         self.plot_widgets = []
         self.plot_curves = []
-        self.plot_titles = ['Encoder Angle (rad)', 'Encoder Velocity (rad/s)', 'Current (A)']
-        for i in range(3):
+        self.plot_titles = ['Encoder Angle (rad)', 'Encoder Velocity (rad/s)', 'Current (A)', 'Torque (Nm)']
+        for i in range(4):
             pw = pg.PlotWidget()
             pw.setTitle(self.plot_titles[i])
             pw.showGrid(x=True, y=True)
@@ -150,20 +186,25 @@ class MainWindow(QtWidgets.QMainWindow):
         self.data_angle = np.zeros(self.max_points)
         self.data_velocity = np.zeros(self.max_points)
         self.data_current = np.zeros(self.max_points)
+        self.data_torque = np.zeros(self.max_points)
         self.data_ptr = 0
         self.data_count = 0
-        # --- Data recording ---
         self.recording = False
         self.record_data = []
         self.record_start_time = None
-        # --- Plot time zero for clear plots ---
         self.plot_time_zero = None
 
     def refresh_ports(self):
         self.port_combo.clear()
-        ports = self.serial_thread.get_available_ports() # Assuming SerialThread has this method
+        ports = self.serial_thread.get_available_ports()
         for p in ports:
             self.port_combo.addItem(p)
+
+    def refresh_torque_ports(self):
+        self.torque_port_combo.clear()
+        ports = TorqueSensor.get_available_ports()
+        for p in ports:
+            self.torque_port_combo.addItem(p)
 
     def connect_serial(self):
         port = self.port_combo.currentText()
@@ -213,9 +254,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.append_hex_log('TX', data['raw_frame'])
         # Only update feedback labels for RX with feedback fields
         if data.get('direction') == 'RX' and 'crc_recv' in data:
-            # --- Timestamp for recording ---
             msg_time = data.get('timestamp', time.perf_counter())
-            # --- Plot time zero logic ---
             if self.plot_time_zero is None:
                 self.plot_time_zero = msg_time
             if self.recording:
@@ -224,13 +263,14 @@ class MainWindow(QtWidgets.QMainWindow):
                 timestamp = msg_time - self.record_start_time
                 self.record_data.append({
                     'timestamp': timestamp,
-                    'encoder': data.get('encoder'),  # now in rad
-                    'velocity': data.get('velocity'),  # now in rad/s
+                    'encoder': data.get('encoder'),
+                    'velocity': data.get('velocity'),
                     'current': data.get('current'),
                     'mode': data.get('mode'),
                     'collision': data.get('collision'),
                     'crc_recv': data.get('crc_recv'),
                     'crc_calc': data.get('crc_calc'),
+                    'torque': self.torque_value,
                     'raw_frame_hex': ' '.join(f'{b:02X}' for b in data['raw_frame'])
                 })
             self.fbk_labels['CRC (recv)'].setText(f"0x{data['crc_recv']:04X}")
@@ -240,7 +280,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.fbk_labels['Encoder Angle (rad)'].setText(f"{data['encoder']:.6f}")
             self.fbk_labels['Encoder Velocity (rad/s)'].setText(f"{data['velocity']:.6f}")
             self.fbk_labels['Collision'].setText('Yes' if data['collision'] else 'No')
-            # Store data for plotting
             t = msg_time
             idx = self.data_ptr % self.max_points
             self.data_time[idx] = t
@@ -251,16 +290,44 @@ class MainWindow(QtWidgets.QMainWindow):
             self.data_count = min(self.data_count + 1, self.max_points)
             self.last_data_time = t
 
+    def update_all(self):
+        # SafeMRC数据由串口线程异步推送，扭矩传感器同步采样
+        # 采样频率由freq_spin控制
+        # 采样时间戳
+        t_now = time.perf_counter()
+        # 采集扭矩传感器
+        torque = 0.0
+        if self.torque_connected:
+            try:
+                torque = self.torque_sensor.read_torque()
+            except Exception:
+                torque = 0.0
+        self.torque_value = torque
+        self.torque_val_label.setText(f'Torque: {torque:.4f} Nm')
+        # SafeMRC数据（最新一帧）
+        idx = self.data_ptr % self.max_points
+        # 时间同步
+        if self.plot_time_zero is None:
+            self.plot_time_zero = t_now
+        t_plot = t_now - self.plot_time_zero
+        # 只在有新SafeMRC数据时推进指针
+        # 这里假设on_data_received会推进data_ptr
+        # 但扭矩数据每tick都采集，保证同步
+        # 更新扭矩数据
+        self.data_torque[idx] = torque
+        # 更新绘图
+        self.update_plots()
+
     def update_plots(self):
         self.plot_window = self.plot_window_spin.value()
         if self.data_count == 0:
             return
-        # Handle ring buffer for time and data arrays
         if self.data_count < self.max_points:
             t_arr = self.data_time[:self.data_count]
             angle_arr = self.data_angle[:self.data_count]
             vel_arr = self.data_velocity[:self.data_count]
             cur_arr = self.data_current[:self.data_count]
+            torque_arr = self.data_torque[:self.data_count]
             t_now = t_arr[-1]
         else:
             idx = self.data_ptr % self.max_points
@@ -268,8 +335,8 @@ class MainWindow(QtWidgets.QMainWindow):
             angle_arr = np.concatenate((self.data_angle[idx:], self.data_angle[:idx]))
             vel_arr = np.concatenate((self.data_velocity[idx:], self.data_velocity[:idx]))
             cur_arr = np.concatenate((self.data_current[idx:], self.data_current[:idx]))
+            torque_arr = np.concatenate((self.data_torque[idx:], self.data_torque[:idx]))
             t_now = t_arr[-1]
-        # Use plot_time_zero for x axis
         if self.plot_time_zero is not None:
             t_plot = t_arr - self.plot_time_zero
         else:
@@ -282,15 +349,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.plot_curves[0].setData(t_plot[mask], angle_arr[mask])
         self.plot_curves[1].setData(t_plot[mask], vel_arr[mask])
         self.plot_curves[2].setData(t_plot[mask], cur_arr[mask])
+        self.plot_curves[3].setData(t_plot[mask], torque_arr[mask])
         for pw in self.plot_widgets:
             pw.setLabel('bottom', 'Time (s)')
 
     def closeEvent(self, event):
         if self.serial_thread.running:
             self.serial_thread.stop()
+        self.torque_sensor.close()
         event.accept()
 
-    # Update parameters when user changes them
     def _update_params(self):
         if self.connected:
             freq = self.freq_spin.value()
@@ -300,7 +368,6 @@ class MainWindow(QtWidgets.QMainWindow):
             device_id = self.id_spin.value()
             self.serial_thread.update_params(send_interval, mode, current, device_id)
 
-    # Connect parameter changes to update
     def showEvent(self, event):
         self.freq_spin.valueChanged.connect(self._update_params)
         self.mode_combo.currentIndexChanged.connect(self._update_params)
@@ -325,7 +392,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.serial_thread.enable_sending(False)
 
     def append_hex_log(self, direction, frame_bytes):
-        # direction: 'TX' or 'RX'
         hex_str = ' '.join(f'{b:02X}' for b in frame_bytes)
         self.hex_log.append(f'<b>{direction}:</b> {hex_str}')
         self.hex_log.moveCursor(QTextCursor.End)
@@ -345,30 +411,52 @@ class MainWindow(QtWidgets.QMainWindow):
         if not self.record_data:
             QtWidgets.QMessageBox.information(self, 'No Data', 'No data to save!')
             return
-        # Ask user for file path
         path, _ = QFileDialog.getSaveFileName(self, 'Save CSV', '', 'CSV Files (*.csv)')
         if not path:
             return
-        # Write CSV
         with open(path, 'w', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=[
-                'timestamp', 'encoder', 'velocity', 'current', 'mode', 'collision', 'crc_recv', 'crc_calc', 'raw_frame_hex'])
+                'timestamp', 'encoder', 'velocity', 'current', 'mode', 'collision', 'crc_recv', 'crc_calc', 'torque', 'raw_frame_hex'])
             writer.writeheader()
             for row in self.record_data:
                 writer.writerow(row)
         QtWidgets.QMessageBox.information(self, 'Saved', f'Data saved to {path}')
 
     def clear_plots(self):
-        # Clear all plot data and reset time
         self.data_time[:] = 0
         self.data_angle[:] = 0
         self.data_velocity[:] = 0
         self.data_current[:] = 0
+        self.data_torque[:] = 0
         self.data_ptr = 0
         self.data_count = 0
         self.plot_time_zero = None
         for curve in self.plot_curves:
             curve.setData([], [])
+
+    def connect_torque_sensor(self):
+        port = self.torque_port_combo.currentText()
+        try:
+            baudrate = int(self.torque_baud_combo.currentText())
+        except ValueError:
+            baudrate = 115200
+        if not port:
+            QtWidgets.QMessageBox.warning(self, 'Warning', 'No torque sensor port selected!')
+            return
+        if self.torque_sensor.initialize(port, baudrate):
+            self.torque_connected = True
+            self.torque_connect_btn.setEnabled(False)
+            self.torque_disconnect_btn.setEnabled(True)
+            self.torque_val_label.setText('Torque: -- Nm')
+        else:
+            QtWidgets.QMessageBox.critical(self, 'Error', 'Failed to connect torque sensor!')
+
+    def disconnect_torque_sensor(self):
+        self.torque_sensor.close()
+        self.torque_connected = False
+        self.torque_connect_btn.setEnabled(True)
+        self.torque_disconnect_btn.setEnabled(False)
+        self.torque_val_label.setText('Torque: -- Nm')
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
