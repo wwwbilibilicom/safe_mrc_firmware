@@ -298,6 +298,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.start_btn.setEnabled(False)
 
     def on_torque_status(self, ok):
+        if self.torque_status_label is None:
+            return
         self.torque_connected = ok
         self.torque_status_label.setText('Connected' if ok else 'Not connected')
         if not ok:
