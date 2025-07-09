@@ -18,11 +18,11 @@ from torque_sensor import TorqueSensorThread
 # -----------------------------
 class MainWindow(QtWidgets.QMainWindow):
     MODES = {0: 'FREE', 1: 'FIX_LIMIT', 2: 'ADAPTATION', 3: 'DEBUG'}
-    COMMON_BAUDRATES = [9600, 19200, 38400, 57600, 115200]
+    COMMON_BAUDRATES = [9600, 19200, 38400, 57600, 115200, 4000000]
     def __init__(self):
         super().__init__()
         self.setWindowTitle('SafeMRC & Torque Sensor Host UI')
-        self.resize(1400, 800)
+        self.resize(1500, 900)
         self._setup_ui()
         self._init_data_buffers()
         # SafeMRC线程
@@ -45,11 +45,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.torque_recording = False
         self.safemrc_record_data = []
         self.torque_record_data = []
+        # 日志缓冲
+        self.hex_log_lines = []
+        self.max_log_lines = 200
 
     def _setup_ui(self):
         central = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(central)
-        # --- SafeMRC区域 ---
+        # --- SafeMRC参数设置区 ---
         safemrc_group = QGroupBox('SafeMRC')
         safemrc_layout = QHBoxLayout()
         self.safemrc_port_combo = QComboBox()
@@ -61,26 +64,48 @@ class MainWindow(QtWidgets.QMainWindow):
             self.safemrc_baud_combo.addItem(str(b))
         self.safemrc_baud_combo.setEditable(True)
         self.safemrc_baud_combo.setCurrentText('4000000')
+        self.safemrc_id_spin = QSpinBox()
+        self.safemrc_id_spin.setRange(1, 255)
+        self.safemrc_id_spin.setValue(1)
+        self.safemrc_mode_combo = QComboBox()
+        for k, v in self.MODES.items():
+            self.safemrc_mode_combo.addItem(v, k)
+        self.safemrc_freq_spin = QSpinBox()
+        self.safemrc_freq_spin.setRange(1, 1000)
+        self.safemrc_freq_spin.setValue(20)
+        self.safemrc_current_spin = QDoubleSpinBox()
+        self.safemrc_current_spin.setRange(-5.0, 5.0)
+        self.safemrc_current_spin.setDecimals(3)
+        self.safemrc_current_spin.setSingleStep(0.01)
+        self.safemrc_current_spin.setValue(0.0)
         self.safemrc_connect_btn = QPushButton('Connect')
         self.safemrc_disconnect_btn = QPushButton('Disconnect')
         self.safemrc_disconnect_btn.setEnabled(False)
         self.safemrc_connect_btn.clicked.connect(self.connect_safemrc)
         self.safemrc_disconnect_btn.clicked.connect(self.disconnect_safemrc)
-        self.safemrc_freq_spin = QSpinBox()
-        self.safemrc_freq_spin.setRange(1, 1000)
-        self.safemrc_freq_spin.setValue(20)
+        self.safemrc_send_btn = QPushButton('Start Sending')
+        self.safemrc_send_btn.setCheckable(True)
+        self.safemrc_send_btn.setEnabled(False)
+        self.safemrc_send_btn.clicked.connect(self.toggle_safemrc_sending)
         safemrc_layout.addWidget(QLabel('Port:'))
         safemrc_layout.addWidget(self.safemrc_port_combo)
         safemrc_layout.addWidget(self.safemrc_refresh_btn)
         safemrc_layout.addWidget(QLabel('Baudrate:'))
         safemrc_layout.addWidget(self.safemrc_baud_combo)
+        safemrc_layout.addWidget(QLabel('ID:'))
+        safemrc_layout.addWidget(self.safemrc_id_spin)
+        safemrc_layout.addWidget(QLabel('Mode:'))
+        safemrc_layout.addWidget(self.safemrc_mode_combo)
         safemrc_layout.addWidget(QLabel('Freq(Hz):'))
         safemrc_layout.addWidget(self.safemrc_freq_spin)
+        safemrc_layout.addWidget(QLabel('Current (A):'))
+        safemrc_layout.addWidget(self.safemrc_current_spin)
         safemrc_layout.addWidget(self.safemrc_connect_btn)
         safemrc_layout.addWidget(self.safemrc_disconnect_btn)
+        safemrc_layout.addWidget(self.safemrc_send_btn)
         safemrc_layout.addStretch()
         safemrc_group.setLayout(safemrc_layout)
-        # --- Torque区域 ---
+        # --- Torque Sensor参数设置区 ---
         torque_group = QGroupBox('Torque Sensor')
         torque_layout = QHBoxLayout()
         self.torque_port_combo = QComboBox()
@@ -92,14 +117,14 @@ class MainWindow(QtWidgets.QMainWindow):
             self.torque_baud_combo.addItem(str(b))
         self.torque_baud_combo.setEditable(True)
         self.torque_baud_combo.setCurrentText('115200')
+        self.torque_freq_spin = QSpinBox()
+        self.torque_freq_spin.setRange(1, 1000)
+        self.torque_freq_spin.setValue(20)
         self.torque_connect_btn = QPushButton('Connect')
         self.torque_disconnect_btn = QPushButton('Disconnect')
         self.torque_disconnect_btn.setEnabled(False)
         self.torque_connect_btn.clicked.connect(self.connect_torque)
         self.torque_disconnect_btn.clicked.connect(self.disconnect_torque)
-        self.torque_freq_spin = QSpinBox()
-        self.torque_freq_spin.setRange(1, 1000)
-        self.torque_freq_spin.setValue(20)
         torque_layout.addWidget(QLabel('Port:'))
         torque_layout.addWidget(self.torque_port_combo)
         torque_layout.addWidget(self.torque_refresh_btn)
@@ -111,16 +136,33 @@ class MainWindow(QtWidgets.QMainWindow):
         torque_layout.addWidget(self.torque_disconnect_btn)
         torque_layout.addStretch()
         torque_group.setLayout(torque_layout)
-        # --- 布局 ---
+        # --- 顶部布局 ---
         top_row = QHBoxLayout()
         top_row.addWidget(safemrc_group)
         top_row.addWidget(torque_group)
         layout.addLayout(top_row)
+        # --- SafeMRC十六进制日志区 ---
+        self.hex_log = QtWidgets.QTextEdit()
+        self.hex_log.setReadOnly(True)
+        self.hex_log.setMaximumHeight(100)
+        layout.addWidget(self.hex_log)
+        # --- SafeMRC反馈区 ---
+        fbk_group = QGroupBox('SafeMRC Feedback')
+        fbk_layout = QHBoxLayout()
+        self.fbk_labels = {}
+        fields = ['CRC (recv)', 'CRC (calc)', 'Current (A)', 'Mode', 'Encoder Angle (rad)', 'Encoder Velocity (rad/s)', 'Collision']
+        for name in fields:
+            label = QLabel('--')
+            fbk_layout.addWidget(QLabel(name+':'))
+            fbk_layout.addWidget(label)
+            self.fbk_labels[name] = label
+        fbk_group.setLayout(fbk_layout)
+        layout.addWidget(fbk_group)
         # --- SafeMRC绘图 ---
+        safemrc_plot_row = QHBoxLayout()
         self.safemrc_plot_widgets = []
         self.safemrc_plot_curves = []
         self.safemrc_plot_titles = ['Encoder Angle (rad)', 'Encoder Velocity (rad/s)', 'Current (A)']
-        safemrc_plot_layout = QHBoxLayout()
         for i in range(3):
             pw = pg.PlotWidget()
             pw.setTitle(self.safemrc_plot_titles[i])
@@ -128,14 +170,38 @@ class MainWindow(QtWidgets.QMainWindow):
             curve = pw.plot([], [], pen=pg.mkPen('b', width=2))
             self.safemrc_plot_widgets.append(pw)
             self.safemrc_plot_curves.append(curve)
-            safemrc_plot_layout.addWidget(pw)
-        layout.addLayout(safemrc_plot_layout)
+            safemrc_plot_row.addWidget(pw)
+        layout.addLayout(safemrc_plot_row)
+        # --- SafeMRC图窗控制 ---
+        safemrc_ctrl_row = QHBoxLayout()
+        safemrc_ctrl_row.addWidget(QLabel('Plot Window (s):'))
+        self.safemrc_plot_window_spin = QSpinBox()
+        self.safemrc_plot_window_spin.setRange(1, 60)
+        self.safemrc_plot_window_spin.setValue(5)
+        safemrc_ctrl_row.addWidget(self.safemrc_plot_window_spin)
+        self.safemrc_clear_plots_btn = QPushButton('Clear Plots')
+        self.safemrc_clear_plots_btn.clicked.connect(self.clear_safemrc_plots)
+        safemrc_ctrl_row.addWidget(self.safemrc_clear_plots_btn)
+        safemrc_ctrl_row.addStretch()
+        layout.addLayout(safemrc_ctrl_row)
         # --- Torque绘图 ---
         self.torque_plot_widget = pg.PlotWidget()
         self.torque_plot_widget.setTitle('Torque (Nm)')
         self.torque_plot_widget.showGrid(x=True, y=True)
         self.torque_plot_curve = self.torque_plot_widget.plot([], [], pen=pg.mkPen('r', width=2))
         layout.addWidget(self.torque_plot_widget)
+        # --- Torque图窗控制 ---
+        torque_ctrl_row = QHBoxLayout()
+        torque_ctrl_row.addWidget(QLabel('Plot Window (s):'))
+        self.torque_plot_window_spin = QSpinBox()
+        self.torque_plot_window_spin.setRange(1, 60)
+        self.torque_plot_window_spin.setValue(5)
+        torque_ctrl_row.addWidget(self.torque_plot_window_spin)
+        self.torque_clear_plots_btn = QPushButton('Clear Plots')
+        self.torque_clear_plots_btn.clicked.connect(self.clear_torque_plots)
+        torque_ctrl_row.addWidget(self.torque_clear_plots_btn)
+        torque_ctrl_row.addStretch()
+        layout.addLayout(torque_ctrl_row)
         # --- SafeMRC录制 ---
         safemrc_record_row = QHBoxLayout()
         self.safemrc_record_start_btn = QPushButton('Start SafeMRC Recording')
@@ -197,14 +263,24 @@ class MainWindow(QtWidgets.QMainWindow):
             baudrate = 4000000
         freq = self.safemrc_freq_spin.value()
         send_interval = 1.0 / freq
-        self.safemrc_thread.configure(port, baudrate, send_interval, 0, 0.0, 1)
+        mode = self.safemrc_mode_combo.currentData()
+        current = self.safemrc_current_spin.value()
+        device_id = self.safemrc_id_spin.value()
+        self.safemrc_thread.configure(port, baudrate, send_interval, mode, current, device_id)
         self.safemrc_thread.start()
         self.safemrc_connect_btn.setEnabled(False)
         self.safemrc_disconnect_btn.setEnabled(True)
+        self.safemrc_send_btn.setEnabled(True)
     def disconnect_safemrc(self):
         self.safemrc_thread.stop()
         self.safemrc_connect_btn.setEnabled(True)
         self.safemrc_disconnect_btn.setEnabled(False)
+        self.safemrc_send_btn.setEnabled(False)
+        self.safemrc_send_btn.setChecked(False)
+    def toggle_safemrc_sending(self):
+        enable = self.safemrc_send_btn.isChecked()
+        self.safemrc_thread.enable_sending(enable)
+        self.safemrc_send_btn.setText('Stop Sending' if enable else 'Start Sending')
     def on_safemrc_status(self, ok):
         self.safemrc_connected = ok
     def on_safemrc_data(self, data):
@@ -217,6 +293,19 @@ class MainWindow(QtWidgets.QMainWindow):
         self.safemrc_ptr += 1
         self.safemrc_count = min(self.safemrc_count + 1, self.max_points)
         self.latest_safemrc = data
+        # 日志区
+        if 'raw_frame' in data and data.get('direction') in ('TX', 'RX'):
+            self.append_hex_log(data.get('direction'), data['raw_frame'])
+        # 反馈区
+        if data.get('direction') == 'RX' and 'crc_recv' in data:
+            self.fbk_labels['CRC (recv)'].setText(f"0x{data['crc_recv']:04X}")
+            self.fbk_labels['CRC (calc)'].setText(f"0x{data['crc_calc']:04X}")
+            self.fbk_labels['Current (A)'].setText(f"{data['current']:.3f}")
+            self.fbk_labels['Mode'].setText(self.MODES.get(data['mode'], str(data['mode'])))
+            self.fbk_labels['Encoder Angle (rad)'].setText(f"{data['encoder']:.6f}")
+            self.fbk_labels['Encoder Velocity (rad/s)'].setText(f"{data['velocity']:.6f}")
+            self.fbk_labels['Collision'].setText('Yes' if data['collision'] else 'No')
+        # 录制
         if self.safemrc_recording:
             self.safemrc_record_data.append({
                 'timestamp': t,
@@ -229,6 +318,14 @@ class MainWindow(QtWidgets.QMainWindow):
                 'crc_calc': data.get('crc_calc', 0),
                 'raw_frame_hex': ' '.join(f'{b:02X}' for b in data.get('raw_frame', b''))
             })
+    def append_hex_log(self, direction, frame_bytes):
+        hex_str = ' '.join(f'{b:02X}' for b in frame_bytes)
+        line = f'<b>{direction}:</b> {hex_str}'
+        self.hex_log_lines.append(line)
+        if len(self.hex_log_lines) > self.max_log_lines:
+            self.hex_log_lines = self.hex_log_lines[-self.max_log_lines:]
+        self.hex_log.setHtml('<br/>'.join(self.hex_log_lines))
+        self.hex_log.moveCursor(QTextCursor.End)
     # --- Torque串口相关 ---
     def refresh_torque_ports(self):
         self.torque_port_combo.clear()
@@ -314,6 +411,22 @@ class MainWindow(QtWidgets.QMainWindow):
             for row in self.torque_record_data:
                 writer.writerow(row)
         QtWidgets.QMessageBox.information(self, 'Saved', f'Torque data saved to {path}')
+    # --- 清空图窗 ---
+    def clear_safemrc_plots(self):
+        self.safemrc_time[:] = 0
+        self.safemrc_angle[:] = 0
+        self.safemrc_velocity[:] = 0
+        self.safemrc_current[:] = 0
+        self.safemrc_ptr = 0
+        self.safemrc_count = 0
+        for curve in self.safemrc_plot_curves:
+            curve.setData([], [])
+    def clear_torque_plots(self):
+        self.torque_time[:] = 0
+        self.torque_value[:] = 0
+        self.torque_ptr = 0
+        self.torque_count = 0
+        self.torque_plot_curve.setData([], [])
     # --- 绘图 ---
     def update_plots(self):
         # SafeMRC
@@ -329,13 +442,17 @@ class MainWindow(QtWidgets.QMainWindow):
                 angle_arr = np.concatenate((self.safemrc_angle[idx:], self.safemrc_angle[:idx]))
                 vel_arr = np.concatenate((self.safemrc_velocity[idx:], self.safemrc_velocity[:idx]))
                 cur_arr = np.concatenate((self.safemrc_current[idx:], self.safemrc_current[:idx]))
-            t0 = t_arr[0]
-            t_plot = t_arr - t0
-            self.safemrc_plot_curves[0].setData(t_plot, angle_arr)
-            self.safemrc_plot_curves[1].setData(t_plot, vel_arr)
-            self.safemrc_plot_curves[2].setData(t_plot, cur_arr)
-            for pw in self.safemrc_plot_widgets:
-                pw.setLabel('bottom', 'Time (s)')
+            # 只显示(当前时间-显示宽度, 当前时间)
+            if len(t_arr) > 0:
+                t_now = t_arr[-1]
+                window = self.safemrc_plot_window_spin.value()
+                mask = (t_arr > t_now - window)
+                t_plot = t_arr[mask] - t_arr[0] if np.any(mask) else []
+                self.safemrc_plot_curves[0].setData(t_plot, angle_arr[mask] if np.any(mask) else [])
+                self.safemrc_plot_curves[1].setData(t_plot, vel_arr[mask] if np.any(mask) else [])
+                self.safemrc_plot_curves[2].setData(t_plot, cur_arr[mask] if np.any(mask) else [])
+                for pw in self.safemrc_plot_widgets:
+                    pw.setLabel('bottom', 'Time (s)')
         # Torque
         if self.torque_count > 0:
             if self.torque_count < self.max_points:
@@ -345,10 +462,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 idx = self.torque_ptr % self.max_points
                 t_arr = np.concatenate((self.torque_time[idx:], self.torque_time[:idx]))
                 torque_arr = np.concatenate((self.torque_value[idx:], self.torque_value[:idx]))
-            t0 = t_arr[0]
-            t_plot = t_arr - t0
-            self.torque_plot_curve.setData(t_plot, torque_arr)
-            self.torque_plot_widget.setLabel('bottom', 'Time (s)')
+            if len(t_arr) > 0:
+                t_now = t_arr[-1]
+                window = self.torque_plot_window_spin.value()
+                mask = (t_arr > t_now - window)
+                t_plot = t_arr[mask] - t_arr[0] if np.any(mask) else []
+                self.torque_plot_curve.setData(t_plot, torque_arr[mask] if np.any(mask) else [])
+                self.torque_plot_widget.setLabel('bottom', 'Time (s)')
     def show_error(self, who, msg):
         QtWidgets.QMessageBox.critical(self, f'{who} Error', msg)
     def closeEvent(self, event):
