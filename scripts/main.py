@@ -231,9 +231,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.torque_plot_time = []
         self.torque_plot_ptr = 0
         self.torque_plot_max_points = 2000
-        self.torque_plot_curve = None
-        self.torque_plot_widget = None
-        self.torque_status_label = None
+        # self.torque_plot_curve = None  # 不要重置UI对象
+        # self.torque_plot_widget = None
+        # self.torque_status_label = None
         self.torque_recording = False
         self.torque_csv_field = False
 
