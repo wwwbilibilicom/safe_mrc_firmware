@@ -22,9 +22,7 @@ class MainWindow(QtWidgets.QMainWindow):
         super().__init__()
         self.setWindowTitle('SafeMRC Host UI')
         self.resize(1000, 800)
-        # 先初始化UI
-        self._setup_ui()
-        # 再初始化数据和线程相关
+        # 先初始化数据和线程相关
         self.serial_thread = SerialThread()
         self.torque_thread = TorqueSensorThread()
         self.torque_connected = False
@@ -40,6 +38,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.torque_plot_max_points = 2000
         self.torque_recording = False
         self.torque_csv_field = False
+        self._setup_ui()
         self.serial_thread.data_received.connect(self.on_data_received)
         self.serial_thread.status_changed.connect(self.on_status_changed)
         self.serial_thread.error_signal.connect(self.show_serial_error)
