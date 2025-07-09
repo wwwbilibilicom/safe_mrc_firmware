@@ -57,10 +57,16 @@ class SerialThread(QtCore.QThread):
         self.mode = 0
         self.current = 0.0
         self.device_id = 1
-        self.lock = threading.Lock()
-        self._stop_event = threading.Event()
+        self.lock = QtCore.QMutex()
+        self._stop_event = False
         self._sending = False
         self._last_cmd = b''
+        self.rx_buffer = b''
+        
+        # 创建发送定时器，在run方法中启动
+        self.send_timer = QtCore.QTimer()
+        self.send_timer.moveToThread(self)
+        self.send_timer.timeout.connect(self.send_command)
 
     def configure(self, port, baudrate, send_interval, mode, current, device_id):
         self.port = port
@@ -74,65 +80,102 @@ class SerialThread(QtCore.QThread):
         try:
             self.ser = serial.Serial(self.port, self.baudrate, timeout=0.1)
             self.running = True
+            self.rx_buffer = b''
             self.status_changed.emit(True)
+            
+            # 启动发送定时器，使用毫秒
+            interval_ms = int(self.send_interval * 1000)
+            self.send_timer.start(interval_ms)
+            
+            # 接收循环
+            while not self._stop_event:
+                try:
+                    if self.ser and self.ser.is_open and self.ser.in_waiting > 0:
+                        self.process_incoming_data()
+                except Exception as e:
+                    import traceback
+                    traceback.print_exc()
+                    # 接收错误不中断线程，只记录
+                QtCore.QThread.msleep(1)  # 非阻塞短暂休眠，降低CPU占用
+                
         except Exception as e:
             import traceback
             msg = f'Failed to open serial port {self.port} at {self.baudrate} baud:\n{e}'
-            print(msg)
             traceback.print_exc()
             self.error_signal.emit(msg)
+        finally:
+            self.send_timer.stop()
+            if self.ser and self.ser.is_open:
+                self.ser.close()
+            self.running = False
             self.status_changed.emit(False)
+
+    def send_command(self):
+        """定时器触发的发送命令函数"""
+        if not self._sending or not self.running:
             return
-        last_send = time.time()
-        buffer = b''
-        while not self._stop_event.is_set():
-            now = time.time()
-            # Only send command if enabled
-            if self._sending and (now - last_send >= self.send_interval):
-                with self.lock:
-                    cmd = self.pack_cmd(self.mode, self.current)
-                    self._last_cmd = cmd
+        try:
+            with QtCore.QMutexLocker(self.lock):
+                cmd = self.pack_cmd(self.mode, self.current)
+                self._last_cmd = cmd
+            
+            if self.ser and self.ser.is_open:
                 self.ser.write(cmd)
-                last_send = now
-                # Emit TX hex log
+                # 发送信号通知UI
                 self.data_received.emit({'raw_frame': cmd, 'direction': 'TX'})
-            # Read feedback
-            try:
-                if self.ser.in_waiting:
-                    buffer += self.ser.read(self.ser.in_waiting)
-                    while len(buffer) >= 17:
-                        idx = buffer.find(b'\xFE\xEE')
-                        if idx == -1:
-                            buffer = b''
-                            break
-                        if len(buffer) - idx < 17:
-                            break
-                        frame = buffer[idx:idx+17]
-                        buffer = buffer[idx+17:]
-                        data = self.parse_feedback(frame)
-                        if data:
-                            data['raw_frame'] = frame
-                            data['direction'] = 'RX'
-                            data['timestamp'] = time.perf_counter()  # 高精度时间戳
-                            self.data_received.emit(data)
-            except Exception:
-                pass
-            time.sleep(0.002)
-        if self.ser:
-            self.ser.close()
-        self.running = False
-        self.status_changed.emit(False)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            # 发送错误不中断线程，只记录
+
+    def process_incoming_data(self):
+        """处理接收到的数据"""
+        if not self.ser or not self.ser.is_open:
+            return
+            
+        buffer = self.ser.read(self.ser.in_waiting)
+        if not buffer:
+            return
+            
+        # 将新数据追加到接收缓冲区
+        self.rx_buffer += buffer
+        
+        # 查找并处理完整帧
+        while len(self.rx_buffer) >= 17:  # 最小完整帧长度
+            idx = self.rx_buffer.find(b'\xFE\xEE')
+            if idx == -1:
+                self.rx_buffer = b''
+                break
+            if len(self.rx_buffer) - idx < 17:
+                self.rx_buffer = self.rx_buffer[idx:]
+                break
+                
+            frame = self.rx_buffer[idx:idx+17]
+            self.rx_buffer = self.rx_buffer[idx+17:]
+            
+            data = self.parse_feedback(frame)
+            if data:
+                data['raw_frame'] = frame
+                data['direction'] = 'RX'
+                data['timestamp'] = time.perf_counter()  # 高精度时间戳
+                self.data_received.emit(data)
 
     def stop(self):
-        self._stop_event.set()
+        self._stop_event = True
+        self.send_timer.stop()
         self.wait()
 
     def update_params(self, send_interval, mode, current, device_id):
-        with self.lock:
+        with QtCore.QMutexLocker(self.lock):
             self.send_interval = send_interval
             self.mode = mode
             self.current = current
             self.device_id = device_id
+            
+        # 更新发送定时器间隔
+        if self.running:
+            interval_ms = int(self.send_interval * 1000)
+            self.send_timer.setInterval(interval_ms)
 
     def pack_cmd(self, mode, current):
         # Command protocol: 0xFE 0xEE id(1) mode(1) current(int32, 4 bytes) CRC(2)
@@ -173,9 +216,9 @@ class SerialThread(QtCore.QThread):
             return None
 
     def enable_sending(self, enable):
-        with self.lock:
-            self._sending = enable 
-
+        with QtCore.QMutexLocker(self.lock):
+            self._sending = enable
+    
     @staticmethod
     def get_available_ports():
         return [p.device for p in serial.tools.list_ports.comports()] 

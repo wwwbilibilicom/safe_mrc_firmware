@@ -276,18 +276,37 @@ class MainWindow(QtWidgets.QMainWindow):
             self.disconnect_btn.setEnabled(False)
             self.start_btn.setEnabled(False)
 
+    def _update_params(self):
+        if self.connected:
+            freq = self.freq_spin.value()
+            send_interval = 1.0 / freq
+            mode = self.mode_combo.currentData()
+            current = self.current_spin.value()
+            device_id = self.id_spin.value()
+            self.serial_thread.update_params(send_interval, mode, current, device_id)
+
     def connect_torque(self):
         port = self.torque_port_combo.currentText()
         baud = int(self.torque_baud_combo.currentText())
         freq = self.torque_freq_spin.value()
         self.torque_thread.configure(port, baud, freq)
-        self.torque_connect_btn.setEnabled(False)
-        self.torque_disconnect_btn.setEnabled(True)
-        self.torque_start_btn.setEnabled(True)
-        self.torque_stop_btn.setEnabled(False)
-        self.torque_connected = True
-        if self.torque_status_label is not None:
-            self.torque_status_label.setText('Connected')
+        try:
+            self.torque_thread.start()
+            self.torque_connect_btn.setEnabled(False)
+            self.torque_disconnect_btn.setEnabled(True)
+            self.torque_start_btn.setEnabled(True)
+            self.torque_stop_btn.setEnabled(False)
+            self.torque_connected = True
+            if self.torque_status_label is not None:
+                self.torque_status_label.setText('Connected')
+        except Exception as e:
+            import traceback
+            QtWidgets.QMessageBox.critical(self, 'Torque Sensor Error', f'Failed to connect torque sensor:\n{e}')
+            print('Torque thread start error:', e)
+            traceback.print_exc()
+            self.torque_connected = False
+            if self.torque_status_label is not None:
+                self.torque_status_label.setText('Connection failed')
 
     def disconnect_serial(self):
         self.serial_thread.stop()
@@ -361,7 +380,10 @@ class MainWindow(QtWidgets.QMainWindow):
                     'raw_frame_hex': ' '.join(f'{b:02X}' for b in data['raw_frame'])
                 }
                 if self.torque_recording and self.torque_plot_data:
-                    record_row['torque'] = self.torque_plot_data[-1]
+                    # 找到最接近当前时间的扭矩数据点
+                    closest_idx = self.find_closest_torque_data(msg_time)
+                    if closest_idx >= 0:
+                        record_row['torque'] = self.torque_plot_data[closest_idx]
                 self.record_data.append(record_row)
             self.fbk_labels['CRC (recv)'].setText(f"0x{data['crc_recv']:04X}")
             self.fbk_labels['CRC (calc)'].setText(f"0x{data['crc_calc']:04X}")
@@ -381,24 +403,38 @@ class MainWindow(QtWidgets.QMainWindow):
             self.data_count = min(self.data_count + 1, self.max_points)
             self.last_data_time = t
 
+    def find_closest_torque_data(self, target_time):
+        """找到时间戳最接近目标时间的扭矩数据索引"""
+        if not self.torque_plot_time:
+            return -1
+        
+        # 找到最接近的时间点
+        closest_idx = 0
+        min_diff = abs(self.torque_plot_time[0] - target_time)
+        
+        for i, t in enumerate(self.torque_plot_time):
+            diff = abs(t - target_time)
+            if diff < min_diff:
+                min_diff = diff
+                closest_idx = i
+        
+        # 如果时间差太大（例如超过采样周期的2倍），可能意味着没有合适的数据点
+        if min_diff > (2.0 / self.torque_freq_spin.value()):
+            return -1
+        
+        return closest_idx
+
     def on_torque_data(self, timestamp, torque):
         # 只有采集线程在运行时才更新数据
         if not self.torque_thread.isRunning():
-            print('Torque thread not running, skip data')
             return
         if not self.torque_connected:
-            print('Torque not connected, skip data')
             return
-        if self.torque_plot_curve is None:
-            print('Warning: torque_plot_curve is None!')
-        print(f'Received torque: {torque}, Plot data length before: {len(self.torque_plot_data)}')
         if len(self.torque_plot_data) >= self.torque_plot_max_points:
             self.torque_plot_data = self.torque_plot_data[1:]
             self.torque_plot_time = self.torque_plot_time[1:]
         self.torque_plot_data.append(torque)
         self.torque_plot_time.append(timestamp)
-        print(f'Plot data length after: {len(self.torque_plot_data)}')
-        # 不直接刷新图像，交给update_plots统一处理
 
     def update_plots(self):
         self.plot_window = self.plot_window_spin.value()
@@ -459,16 +495,6 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.torque_thread.running:
             self.torque_thread.stop()
         event.accept()
-
-    # Update parameters when user changes them
-    def _update_params(self):
-        if self.connected:
-            freq = self.freq_spin.value()
-            send_interval = 1.0 / freq
-            mode = self.mode_combo.currentData()
-            current = self.current_spin.value()
-            device_id = self.id_spin.value()
-            self.serial_thread.update_params(send_interval, mode, current, device_id)
 
     # Connect parameter changes to update
     def showEvent(self, event):
