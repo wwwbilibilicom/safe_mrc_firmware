@@ -279,13 +279,14 @@ class PlotDataManager:
                 
             self.data_buffers[name].append(value)
             
-    def get_plot_data(self, channel, window=None):
+    def get_plot_data(self, channel, window=None, max_points=500):
         """
-        获取指定通道的绘图数据
+        获取指定通道的绘图数据，支持降采样
         
         Args:
             channel: 通道名称
             window: 时间窗口大小（秒），如果为None则返回所有数据
+            max_points: 最大返回点数，用于降采样
             
         Returns:
             tuple: (x, y) 时间和数据数组
@@ -310,6 +311,13 @@ class PlotDataManager:
             mask = t_arr > (t_now - window)
             t_arr = t_arr[mask]
             y_arr = y_arr[mask]
+        
+        # 执行降采样
+        if len(t_arr) > max_points:
+            # 计算降采样间隔
+            step = len(t_arr) // max_points
+            t_arr = t_arr[::step]
+            y_arr = y_arr[::step]
             
         return t_arr, y_arr
         

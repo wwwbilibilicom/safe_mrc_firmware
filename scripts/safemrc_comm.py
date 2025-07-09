@@ -5,6 +5,8 @@ import threading
 import time
 import serial
 import serial.tools.list_ports
+import sys
+import os
 from PyQt5 import QtCore
 from error_handler import ErrorHandler, ErrorSeverity, logger
 from config import SAFEMRC_HEADER, RX_POLL_INTERVAL
@@ -94,6 +96,11 @@ class SerialThread(QtCore.QThread):
         self._last_send_time = 0
         self._buffer = b''
         
+        # 批处理数据
+        self._data_buffer = []
+        self._last_emit_time = 0
+        self._emit_interval = 0.05  # 50毫秒发送一次数据
+        
         # 发送定时器
         self._tx_timer = QtCore.QTimer()
         self._tx_timer.moveToThread(self)
@@ -154,6 +161,36 @@ class SerialThread(QtCore.QThread):
 
         # 退出时清理资源
         self._cleanup()
+        
+    # 槽函数：更新定时器间隔
+    @QtCore.pyqtSlot(int)
+    def _update_timer_interval(self, interval_ms):
+        """
+        更新发送定时器间隔（必须在定时器所在线程中调用）
+        
+        Args:
+            interval_ms: 定时器间隔（毫秒）
+        """
+        if self._tx_timer.isActive():
+            self._tx_timer.setInterval(interval_ms)
+            logger.info(f"SafeMRC发送间隔已更新: {interval_ms}ms ({1000/interval_ms:.1f}Hz)")
+            
+    # 槽函数：重置定时器
+    @QtCore.pyqtSlot(int)
+    def _reset_timer(self, interval_ms):
+        """
+        完全重置定时器（停止并重新启动）
+        
+        Args:
+            interval_ms: 新的定时器间隔（毫秒）
+        """
+        # 安全地停止定时器
+        if self._tx_timer.isActive():
+            self._tx_timer.stop()
+            
+        # 重新启动定时器
+        self._tx_timer.start(interval_ms)
+        logger.info(f"SafeMRC发送定时器已重置: {interval_ms}ms ({1000/interval_ms:.1f}Hz)")
 
     def _cleanup(self):
         """清理资源并通知状态变化"""
@@ -225,8 +262,14 @@ class SerialThread(QtCore.QThread):
                 data['direction'] = 'RX'
                 data['timestamp'] = time.perf_counter()  # 高精度时间戳
                 
-                # 发送数据信号
-                self.data_received.emit(data)
+                # 添加到批处理缓冲区
+                self._data_buffer.append(data)
+                
+                # 检查是否需要发送
+                current_time = time.perf_counter()
+                if current_time - self._last_emit_time >= self._emit_interval:
+                    self._emit_data_buffer()
+                    self._last_emit_time = current_time
 
     def _poll_read(self):
         """定时器触发的数据接收函数"""
@@ -248,6 +291,10 @@ class SerialThread(QtCore.QThread):
         self._stop_event.set()
         # 立即停止发送
         self._sending = False
+        
+        # 发送剩余的数据缓冲区
+        self._emit_data_buffer()
+        
         # 退出事件循环
         QtCore.QMetaObject.invokeMethod(self, 'quit')
         # 等待线程结束
@@ -267,16 +314,26 @@ class SerialThread(QtCore.QThread):
             device_id: 设备ID
         """
         with QtCore.QMutexLocker(self.lock):
+            # 更新参数
+            old_interval = self.send_interval
             self.send_interval = send_interval
             self.mode = mode
             self.current = current
             self.device_id = device_id
             
-            # 更新定时器间隔
-            if self._tx_timer.isActive():
+            # 如果发送间隔变化了，需要更新定时器
+            if old_interval != send_interval:
                 interval_ms = round(send_interval * 1000)
-                self._tx_timer.setInterval(interval_ms)
-                logger.info(f"SafeMRC发送间隔已更新: {interval_ms}ms ({1/send_interval:.1f}Hz)")
+                
+                # 使用invokeMethod安全地跨线程重置定时器
+                # 这里使用_reset_timer而不是_update_timer_interval
+                QtCore.QMetaObject.invokeMethod(
+                    self, 
+                    "_reset_timer", 
+                    QtCore.Qt.QueuedConnection,
+                    QtCore.Q_ARG(int, interval_ms)
+                )
+                logger.info(f"已请求重置发送定时器: {interval_ms}ms ({1000/interval_ms:.1f}Hz)")
 
     def pack_cmd(self, mode, current):
         """
@@ -358,6 +415,18 @@ class SerialThread(QtCore.QThread):
             elif was_sending and not enable:
                 logger.info("SafeMRC命令发送已禁用")
     
+    def _emit_data_buffer(self):
+        """发送批处理数据缓冲区中的数据"""
+        if not self._data_buffer:
+            return
+            
+        # 克隆缓冲区并发送
+        buffer_to_send = self._data_buffer.copy()
+        self._data_buffer = []
+        
+        # 批量发送
+        self.data_received.emit({'batch': buffer_to_send})
+    
     @staticmethod
     def get_available_ports():
         """
@@ -366,4 +435,45 @@ class SerialThread(QtCore.QThread):
         Returns:
             list: 可用串口名称列表
         """
-        return [p.device for p in serial.tools.list_ports.comports()] 
+        try:
+            logger.info("开始获取可用串口列表...")
+            
+            # 检查操作系统类型
+            if sys.platform.startswith('win'):
+                logger.info(f"当前操作系统: Windows ({sys.platform})")
+                # Windows系统下，尝试直接枚举COM端口
+                ports = []
+                # 首先尝试使用serial.tools.list_ports.comports()
+                comports = list(serial.tools.list_ports.comports())
+                logger.info(f"通过pyserial找到 {len(comports)} 个串口")
+                
+                if comports:
+                    for port in comports:
+                        ports.append(port.device)
+                        logger.info(f"找到串口: {port.device} ({port.description})")
+                else:
+                    # 如果没有找到，尝试手动枚举常见COM端口
+                    logger.info("未找到串口，尝试手动枚举COM端口...")
+                    for i in range(1, 21):  # 检查COM1到COM20
+                        port_name = f"COM{i}"
+                        try:
+                            s = serial.Serial(port_name)
+                            s.close()
+                            ports.append(port_name)
+                            logger.info(f"手动检测到可用串口: {port_name}")
+                        except (OSError, serial.SerialException):
+                            pass
+                
+                if not ports:
+                    logger.warning("未找到任何可用串口")
+                return ports
+            else:
+                # 其他操作系统使用标准方法
+                logger.info(f"当前操作系统: {sys.platform}")
+                comports = list(serial.tools.list_ports.comports())
+                ports = [p.device for p in comports]
+                logger.info(f"找到 {len(ports)} 个串口: {', '.join(ports)}")
+                return ports
+        except Exception as e:
+            logger.error(f"获取可用串口列表失败: {str(e)}")
+            return [] 

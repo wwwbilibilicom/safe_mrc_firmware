@@ -5,6 +5,7 @@ from PyQt5 import QtWidgets, QtCore
 import pyqtgraph as pg
 from PyQt5.QtGui import QTextCursor
 from config import PLOT_TITLES
+import time
 
 class HexLogWidget(QtWidgets.QTextEdit):
     """十六进制日志显示组件"""
@@ -14,6 +15,9 @@ class HexLogWidget(QtWidgets.QTextEdit):
         super().__init__(parent)
         self.setReadOnly(True)
         self.setMaximumHeight(max_height)
+        self._log_buffer = []
+        self._last_update_time = 0
+        self._update_interval = 0.5  # 500毫秒更新一次日志
         
     def append_hex_log(self, direction, frame_bytes):
         """
@@ -24,7 +28,28 @@ class HexLogWidget(QtWidgets.QTextEdit):
             frame_bytes: 帧数据字节
         """
         hex_str = ' '.join(f'{b:02X}' for b in frame_bytes)
-        self.append(f'<b>{direction}:</b> {hex_str}')
+        self._log_buffer.append(f'<b>{direction}:</b> {hex_str}')
+        
+        # 检查是否应该更新UI
+        current_time = time.time()
+        if current_time - self._last_update_time >= self._update_interval:
+            self._flush_log_buffer()
+            self._last_update_time = current_time
+            
+    def _flush_log_buffer(self):
+        """将缓冲区中的日志刷新到UI"""
+        if not self._log_buffer:
+            return
+            
+        # 最多显示最近的5条
+        if len(self._log_buffer) > 5:
+            self.append("... (省略 {} 条)".format(len(self._log_buffer) - 5))
+            self._log_buffer = self._log_buffer[-5:]
+            
+        for log in self._log_buffer:
+            super().append(log)
+            
+        self._log_buffer = []
         self.moveCursor(QTextCursor.End)
 
 
@@ -46,6 +71,11 @@ class PlotWidget:
         self.plot_widget.showGrid(x=True, y=True)
         self.plot_widget.setLabel('bottom', 'Time (s)')
         self.curve = self.plot_widget.plot([], [], pen=pg.mkPen(color, width=width))
+        
+        # 设置高性能模式
+        self.plot_widget.setDownsampling(auto=True, mode='peak')
+        self.plot_widget.setClipToView(True)
+        self.plot_widget.setAntialiasing(False)
         
     def set_data(self, x, y):
         """
@@ -71,6 +101,11 @@ class SerialPortSelector(QtWidgets.QWidget):
     
     port_changed = QtCore.pyqtSignal(str)
     
+    # 类变量，用于缓存串口列表
+    _cached_ports = []
+    _last_refresh_time = 0
+    _cache_valid_time = 5  # 缓存有效时间(秒)
+    
     def __init__(self, parent=None, label_text="Serial Port:"):
         """初始化串口选择组件"""
         super().__init__(parent)
@@ -94,37 +129,79 @@ class SerialPortSelector(QtWidgets.QWidget):
         # 连接信号
         self.port_combo.currentTextChanged.connect(self.port_changed)
         
-    def refresh_ports(self, ports=None):
+    def refresh_ports(self, ports=None, force=False):
         """
         刷新可用串口列表
         
         Args:
             ports: 可用串口列表，如果为None则自动获取
+            force: 是否强制刷新，忽略缓存
         """
+        from error_handler import logger
         current = self.port_combo.currentText()
         self.port_combo.clear()
         
-        if ports is None:
-            # 导入这里以避免循环导入
-            from safemrc_comm import SerialThread
-            ports = SerialThread.get_available_ports()
+        try:
+            # 如果没有提供端口列表，则尝试使用缓存或获取新的列表
+            if ports is None:
+                current_time = time.time()
+                
+                # 如果缓存有效且未强制刷新，则使用缓存
+                if (not force and 
+                    SerialPortSelector._cached_ports and 
+                    current_time - SerialPortSelector._last_refresh_time < SerialPortSelector._cache_valid_time):
+                    logger.info("使用缓存的串口列表")
+                    ports = SerialPortSelector._cached_ports
+                else:
+                    # 否则重新获取串口列表
+                    logger.info("重新获取串口列表")
+                    from safemrc_comm import SerialThread
+                    ports = SerialThread.get_available_ports()
+                    
+                    # 更新缓存
+                    SerialPortSelector._cached_ports = ports
+                    SerialPortSelector._last_refresh_time = current_time
+                
+            # 如果没有可用端口，显示提示信息
+            if not ports:
+                logger.warning("没有找到可用串口")
+                self.port_combo.addItem("-- 无可用串口 --")
+                return
             
-        for p in ports:
-            self.port_combo.addItem(p)
+            # 添加找到的串口到下拉框
+            for p in ports:
+                self.port_combo.addItem(p)
             
-        # 尝试恢复之前的选择
-        index = self.port_combo.findText(current)
-        if index >= 0:
-            self.port_combo.setCurrentIndex(index)
+            # 尝试恢复之前的选择
+            index = self.port_combo.findText(current)
+            if index >= 0:
+                self.port_combo.setCurrentIndex(index)
+            
+            logger.info(f"串口列表已刷新，共 {len(ports)} 个串口")
+                
+        except Exception as e:
+            from error_handler import logger
+            logger.error(f"刷新串口列表失败: {str(e)}")
+            self.port_combo.addItem("-- 刷新失败 --")
             
     def get_current_port(self):
         """获取当前选择的串口"""
-        return self.port_combo.currentText()
+        port = self.port_combo.currentText()
+        # 如果是提示文本则返回空字符串
+        if port.startswith("--"):
+            return ""
+        return port
         
     def set_enabled(self, enabled):
         """设置组件是否启用"""
         self.port_combo.setEnabled(enabled)
         self.refresh_btn.setEnabled(enabled)
+        
+    @classmethod
+    def clear_cache(cls):
+        """清除串口列表缓存"""
+        cls._cached_ports = []
+        cls._last_refresh_time = 0
 
 
 class FeedbackDisplay(QtWidgets.QGroupBox):
@@ -216,7 +293,13 @@ class MultiPlotWidget(QtWidgets.QWidget):
             y: y轴数据
         """
         if 0 <= index < len(self.plot_widgets):
-            self.plot_widgets[index].set_data(x, y)
+            # 限制绘制点数
+            max_plot_points = 1000  # 最大绘制1000个点
+            if len(x) > max_plot_points:
+                step = len(x) // max_plot_points
+                self.plot_widgets[index].set_data(x[::step], y[::step])
+            else:
+                self.plot_widgets[index].set_data(x, y)
             
     def clear(self):
         """清空所有图表数据"""

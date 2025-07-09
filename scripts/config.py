@@ -24,8 +24,8 @@ TORQUE_CONVERSION_FACTOR = 30.0  # 统一转换系数
 
 # 绘图配置
 DEFAULT_PLOT_WINDOW = 1  # 默认显示1秒数据
-MAX_PLOT_POINTS = 2000
-PLOT_UPDATE_INTERVAL = 30  # 毫秒
+MAX_PLOT_POINTS = 10000  # 增大缓冲区，减少数据丢失
+PLOT_UPDATE_INTERVAL = 100  # 毫秒，降低为100毫秒刷新一次
 PLOT_TITLES = ['Encoder Angle (rad)', 'Encoder Velocity (rad/s)', 'Current (A)', 'Torque (Nm)']
 
 # 通信协议配置
