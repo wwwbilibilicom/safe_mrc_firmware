@@ -22,6 +22,9 @@ class MainWindow(QtWidgets.QMainWindow):
         super().__init__()
         self.setWindowTitle('SafeMRC Host UI')
         self.resize(1000, 800)
+        # 先初始化UI
+        self._setup_ui()
+        # 再初始化数据和线程相关
         self.serial_thread = SerialThread()
         self.torque_thread = TorqueSensorThread()
         self.torque_connected = False
@@ -35,18 +38,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.torque_plot_time = []
         self.torque_plot_ptr = 0
         self.torque_plot_max_points = 2000
-        self.torque_plot_curve = None
-        self.torque_plot_widget = None
-        self.torque_status_label = None
         self.torque_recording = False
         self.torque_csv_field = False
-        self.torque_thread.data_received.connect(self.on_torque_data)
-        self.torque_thread.status_changed.connect(self.on_torque_status)
-        self.torque_thread.error_signal.connect(self.on_torque_error)
         self.serial_thread.data_received.connect(self.on_data_received)
         self.serial_thread.status_changed.connect(self.on_status_changed)
         self.serial_thread.error_signal.connect(self.show_serial_error)
-        self._setup_ui()
+        self.torque_thread.data_received.connect(self.on_torque_data)
+        self.torque_thread.status_changed.connect(self.on_torque_status)
+        self.torque_thread.error_signal.connect(self.on_torque_error)
         self._init_data_buffers()
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update_plots)
@@ -550,6 +549,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def start_torque_sampling(self):
         if not self.torque_connected:
+            return
+        if self.torque_plot_curve is None:
+            QtWidgets.QMessageBox.warning(self, 'Warning', 'Torque plot window not ready, please wait for UI to load.')
             return
         if not self.torque_thread.isRunning():
             self.torque_thread._stop_event = False
