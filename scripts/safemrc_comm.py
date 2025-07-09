@@ -65,6 +65,12 @@ class SerialThread(QtCore.QThread):
         
         # 创建发送定时器，但不要立即moveToThread，而是在run方法中创建
         self.send_timer = None
+        self.last_send_time = 0
+        
+        # 发送频率监控
+        self.send_count = 0
+        self.last_send_count_time = 0
+        self.send_freq_monitor = True
 
     def configure(self, port, baudrate, send_interval, mode, current, device_id):
         self.port = port
@@ -93,37 +99,41 @@ class SerialThread(QtCore.QThread):
             self.rx_buffer = b''
             self.status_changed.emit(True)
             
-            # 创建发送定时器
-            self.send_timer = QtCore.QTimer()
-            print("SafeMRC: 创建定时器")
-            
-            # 确保定时器在当前线程中运行
-            self.send_timer.moveToThread(self)
-            print("SafeMRC: 移动定时器到当前线程")
-            
-            # 连接定时器信号到发送命令方法
-            self.send_timer.timeout.connect(self.send_command)
-            print("SafeMRC: 连接定时器信号到send_command方法")
-            
-            # 启动发送定时器，使用毫秒
-            interval_ms = int(self.send_interval * 1000)
-            self.send_timer.start(interval_ms)
-            print(f"SafeMRC: 发送定时器已启动，间隔 {interval_ms} ms")
-            
-            # 手动触发一次发送，测试是否正常
-            QtCore.QTimer.singleShot(100, self.send_command)
-            print("SafeMRC: 手动触发一次发送")
+            # 使用更可靠的时间控制方法
+            self.last_send_time = time.perf_counter()
+            self.last_send_count_time = time.perf_counter()
+            self.send_count = 0
             
             # 接收循环
             while not self._stop_event:
                 try:
+                    # 定时发送
+                    current_time = time.perf_counter()
+                    if self._sending and current_time - self.last_send_time >= self.send_interval:
+                        # 高频率发送时，可能需要多次发送以赶上时间
+                        while self._sending and current_time - self.last_send_time >= self.send_interval:
+                            self.send_command()
+                            self.last_send_time += self.send_interval  # 使用固定间隔，避免时间漂移
+                            self.send_count += 1
+                        
+                        # 监控发送频率
+                        if self.send_freq_monitor and current_time - self.last_send_count_time >= 1.0:
+                            send_freq = self.send_count / (current_time - self.last_send_count_time)
+                            print(f"SafeMRC: 实际发送频率 {send_freq:.2f} Hz，目标频率 {1.0/self.send_interval:.2f} Hz")
+                            self.send_count = 0
+                            self.last_send_count_time = current_time
+                    
+                    # 处理接收
                     if self.ser and self.ser.is_open and self.ser.in_waiting > 0:
                         self.process_incoming_data()
+                        
+                    # 根据发送频率动态调整休眠时间，降低CPU占用
+                    sleep_time = min(1, max(0.5 * self.send_interval, 0.001))
+                    QtCore.QThread.msleep(int(sleep_time * 1000))
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
                     # 接收错误不中断线程，只记录
-                QtCore.QThread.msleep(1)  # 非阻塞短暂休眠，降低CPU占用
                 
         except Exception as e:
             import traceback
@@ -131,15 +141,15 @@ class SerialThread(QtCore.QThread):
             traceback.print_exc()
             self.error_signal.emit(msg)
         finally:
-            self.send_timer.stop()
+            if self.send_timer:
+                self.send_timer.stop()
             if self.ser and self.ser.is_open:
                 self.ser.close()
             self.running = False
             self.status_changed.emit(False)
 
     def send_command(self):
-        """定时器触发的发送命令函数"""
-        print(f"SafeMRC send_command被调用: _sending={self._sending}, running={self.running}")
+        """发送命令函数"""
         if not self._sending or not self.running:
             return
         try:
@@ -148,9 +158,7 @@ class SerialThread(QtCore.QThread):
                 self._last_cmd = cmd
             
             if self.ser and self.ser.is_open:
-                print(f"SafeMRC sending command: {' '.join(f'{b:02X}' for b in cmd)}")
                 bytes_written = self.ser.write(cmd)
-                print(f"SafeMRC 已发送 {bytes_written} 字节")
                 # 发送信号通知UI
                 self.data_received.emit({'raw_frame': cmd, 'direction': 'TX'})
             else:
@@ -208,8 +216,9 @@ class SerialThread(QtCore.QThread):
             
         # 更新发送定时器间隔
         if self.running:
-            interval_ms = int(self.send_interval * 1000)
-            self.send_timer.setInterval(interval_ms)
+            # interval_ms = int(self.send_interval * 1000) # This line is no longer needed
+            # self.send_timer.setInterval(interval_ms) # This line is no longer needed
+            pass # The send_command will now use the new time control logic
 
     def pack_cmd(self, mode, current):
         # Command protocol: 0xFE 0xEE id(1) mode(1) current(int32, 4 bytes) CRC(2)
@@ -254,11 +263,9 @@ class SerialThread(QtCore.QThread):
         with QtCore.QMutexLocker(self.lock):
             self._sending = enable
         
-        # 如果启用发送，立即触发一次发送
+        # 如果启用发送，重置发送时间
         if enable and self.running:
-            print("SafeMRC: 立即触发一次发送")
-            # 使用singleShot确保在GUI线程中执行
-            QtCore.QTimer.singleShot(10, self.send_command)
+            self.last_send_time = time.perf_counter() - self.send_interval  # 确保立即发送一次
     
     @staticmethod
     def get_available_ports():

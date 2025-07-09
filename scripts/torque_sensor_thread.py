@@ -22,11 +22,19 @@ class TorqueSensorThread(QtCore.QThread):
         
         # 创建发送定时器，但不要立即moveToThread，而是在run方法中创建
         self.send_timer = None
+        self.last_send_time = 0
+        self.send_interval = 0.001  # 默认1000Hz
+        
+        # 发送频率监控
+        self.send_count = 0
+        self.last_send_count_time = 0
+        self.send_freq_monitor = True
 
     def configure(self, port, baudrate, freq):
         self.port = port
         self.baudrate = baudrate
         self.freq = freq
+        self.send_interval = 1.0 / freq if freq > 0 else 0.001
 
     def run(self):
         try:
@@ -52,61 +60,64 @@ class TorqueSensorThread(QtCore.QThread):
             self.running = True
             self.status_changed.emit(True)
             
-            # 创建发送定时器
-            self.send_timer = QtCore.QTimer()
-            print("扭矩传感器: 创建定时器")
+            # 使用更可靠的时间控制方法
+            self.last_send_time = time.perf_counter()
+            self.last_send_count_time = time.perf_counter()
+            self.send_count = 0
             
-            # 确保定时器在当前线程中运行
-            self.send_timer.moveToThread(self)
-            print("扭矩传感器: 移动定时器到当前线程")
-            
-            # 连接定时器信号到发送命令方法
-            self.send_timer.timeout.connect(self.send_command)
-            print("扭矩传感器: 连接定时器信号到send_command方法")
-            
-            # 启动发送定时器，使用毫秒
-            interval_ms = int(1000.0 / self.freq) if self.freq > 0 else 1
-            self.send_timer.start(interval_ms)
-            print(f"扭矩传感器: 发送定时器已启动，间隔 {interval_ms} ms")
-            
-            # 手动触发一次发送，测试是否正常
-            QtCore.QTimer.singleShot(100, self.send_command)
-            print("扭矩传感器: 手动触发一次发送")
+            # 预先准备好发送数据，避免重复创建
+            self.awake_cmd = bytes([0x01, 0x03, 0x00, 0x1E, 0x00, 0x02, 0xA4, 0x0D])
             
             # 接收循环
             while not self._stop_event:
                 try:
+                    # 定时发送
+                    current_time = time.perf_counter()
+                    if self._sampling and current_time - self.last_send_time >= self.send_interval:
+                        # 高频率发送时，可能需要多次发送以赶上时间
+                        while self._sampling and current_time - self.last_send_time >= self.send_interval:
+                            self.send_command()
+                            self.last_send_time += self.send_interval  # 使用固定间隔，避免时间漂移
+                            self.send_count += 1
+                        
+                        # 监控发送频率
+                        if self.send_freq_monitor and current_time - self.last_send_count_time >= 1.0:
+                            send_freq = self.send_count / (current_time - self.last_send_count_time)
+                            print(f"扭矩传感器: 实际发送频率 {send_freq:.2f} Hz，目标频率 {1.0/self.send_interval:.2f} Hz")
+                            self.send_count = 0
+                            self.last_send_count_time = current_time
+                    
+                    # 处理接收
                     if self.ser and self.ser.is_open and self.ser.in_waiting > 0:
                         self.process_incoming_data()
+                        
+                    # 根据发送频率动态调整休眠时间，降低CPU占用
+                    sleep_time = min(1, max(0.5 * self.send_interval, 0.001))
+                    QtCore.QThread.msleep(int(sleep_time * 1000))
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
                     # 接收错误不中断线程，只记录
-                QtCore.QThread.msleep(1)  # 非阻塞短暂休眠，降低CPU占用
                 
         except Exception as e:
             import traceback
             traceback.print_exc()
             self.error_signal.emit(str(e))
         finally:
-            self.send_timer.stop()
+            if self.send_timer:
+                self.send_timer.stop()
             if self.ser and self.ser.is_open:
                 self.ser.close()
             self.running = False
             self.status_changed.emit(False)
 
     def send_command(self):
-        """定时器触发的发送命令函数"""
-        print(f"Torque sensor send_command被调用: _sampling={self._sampling}, running={self.running}")
+        """发送命令函数"""
         if not self._sampling or not self.running or not self.ser or not self.ser.is_open:
             return
         try:
-            # 发送读取命令
-            awake = bytes([0x01, 0x03, 0x00, 0x1E, 0x00, 0x02, 0xA4, 0x0D])
-            print(f"Torque sensor sending command: {' '.join(f'{b:02X}' for b in awake)}")
-            self.ser.reset_input_buffer()
-            bytes_written = self.ser.write(awake)
-            print(f"Torque sensor 已发送 {bytes_written} 字节")
+            # 使用预先准备好的命令
+            self.ser.write(self.awake_cmd)
         except Exception as e:
             import traceback
             print(f"Torque sensor send_command异常: {e}")
@@ -156,23 +167,17 @@ class TorqueSensorThread(QtCore.QThread):
                 self.baudrate = baudrate
             if freq is not None:
                 self.freq = freq
+                self.send_interval = 1.0 / freq if freq > 0 else 0.001
                 
-        # 更新发送定时器间隔
-        if self.running and freq is not None:
-            interval_ms = int(1000.0 / self.freq) if self.freq > 0 else 1
-            self.send_timer.setInterval(interval_ms)
-    
     def enable_sampling(self, enable):
         """启用或禁用采样"""
         print(f"扭矩传感器: {'启用' if enable else '禁用'}采样，当前状态: _sampling={self._sampling}, running={self.running}")
         with QtCore.QMutexLocker(self.lock):
             self._sampling = enable
             
-        # 如果启用采样，立即触发一次发送
+        # 如果启用采样，重置发送时间
         if enable and self.running:
-            print("扭矩传感器: 立即触发一次发送")
-            # 使用singleShot确保在GUI线程中执行
-            QtCore.QTimer.singleShot(10, self.send_command)
+            self.last_send_time = time.perf_counter() - self.send_interval  # 确保立即发送一次
     
     @staticmethod
     def hex2dec(hex_data):
