@@ -402,41 +402,44 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def update_plots(self):
         self.plot_window = self.plot_window_spin.value()
-        if self.data_count == 0:
-            return
-        # Handle ring buffer for time and data arrays
-        if self.data_count < self.max_points:
-            t_arr = self.data_time[:self.data_count]
-            angle_arr = self.data_angle[:self.data_count]
-            vel_arr = self.data_velocity[:self.data_count]
-            cur_arr = self.data_current[:self.data_count]
-            t_now = t_arr[-1]
+        
+        # ---------- SafeMRC 绘图 ----------
+        if self.data_count > 0:
+            # Handle ring buffer for time and data arrays
+            if self.data_count < self.max_points:
+                t_arr = self.data_time[:self.data_count]
+                angle_arr = self.data_angle[:self.data_count]
+                vel_arr = self.data_velocity[:self.data_count]
+                cur_arr = self.data_current[:self.data_count]
+                t_now = t_arr[-1]
+            else:
+                idx = self.data_ptr % self.max_points
+                t_arr = np.concatenate((self.data_time[idx:], self.data_time[:idx]))
+                angle_arr = np.concatenate((self.data_angle[idx:], self.data_angle[:idx]))
+                vel_arr = np.concatenate((self.data_velocity[idx:], self.data_velocity[:idx]))
+                cur_arr = np.concatenate((self.data_current[idx:], self.data_current[:idx]))
+                t_now = t_arr[-1]
+            # Use plot_time_zero for x axis
+            if self.plot_time_zero is not None:
+                t_plot = t_arr - self.plot_time_zero
+            else:
+                t_plot = t_arr
+            mask = (t_arr > t_now - self.plot_window)
+            if np.any(mask):
+                self.plot_curves[0].setData(t_plot[mask], angle_arr[mask])
+                self.plot_curves[1].setData(t_plot[mask], vel_arr[mask])
+                self.plot_curves[2].setData(t_plot[mask], cur_arr[mask])
+                for pw in self.plot_widgets:
+                    pw.setLabel('bottom', 'Time (s)')
+            else:
+                for curve in self.plot_curves:
+                    curve.setData([], [])
         else:
-            idx = self.data_ptr % self.max_points
-            t_arr = np.concatenate((self.data_time[idx:], self.data_time[:idx]))
-            angle_arr = np.concatenate((self.data_angle[idx:], self.data_angle[:idx]))
-            vel_arr = np.concatenate((self.data_velocity[idx:], self.data_velocity[:idx]))
-            cur_arr = np.concatenate((self.data_current[idx:], self.data_current[:idx]))
-            t_now = t_arr[-1]
-        # Use plot_time_zero for x axis
-        if self.plot_time_zero is not None:
-            t_plot = t_arr - self.plot_time_zero
-        else:
-            t_plot = t_arr
-        mask = (t_arr > t_now - self.plot_window)
-        if not np.any(mask):
+            # SafeMRC没有数据，清空曲线
             for curve in self.plot_curves:
                 curve.setData([], [])
-            # 扭矩传感器绘图保护
-            if self.torque_plot_curve is not None and self.torque_plot_data:
-                self.torque_plot_curve.setData([], [])
-            return
-        self.plot_curves[0].setData(t_plot[mask], angle_arr[mask])
-        self.plot_curves[1].setData(t_plot[mask], vel_arr[mask])
-        self.plot_curves[2].setData(t_plot[mask], cur_arr[mask])
-        for pw in self.plot_widgets:
-            pw.setLabel('bottom', 'Time (s)')
-        # 扭矩传感器绘图
+        
+        # ---------- 扭矩传感器绘图 ----------
         if self.torque_plot_curve is not None and self.torque_plot_data:
             t0 = self.torque_plot_time[0]
             t_plot = [t - t0 for t in self.torque_plot_time]
@@ -446,6 +449,9 @@ class MainWindow(QtWidgets.QMainWindow):
             x = [tt for tt, m in zip(t_plot, mask) if m]
             y = [yy for yy, m in zip(self.torque_plot_data, mask) if m]
             self.torque_plot_curve.setData(x, y)
+        else:
+            if self.torque_plot_curve is not None:
+                self.torque_plot_curve.setData([], [])
 
     def closeEvent(self, event):
         if self.serial_thread.running:
