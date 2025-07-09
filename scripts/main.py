@@ -396,25 +396,28 @@ class MainWindow(QtWidgets.QMainWindow):
         if not np.any(mask):
             for curve in self.plot_curves:
                 curve.setData([], [])
+            # 扭矩传感器绘图保护
+            if self.torque_plot_curve is not None:
+                self.torque_plot_curve.setData([], [])
             return
         self.plot_curves[0].setData(t_plot[mask], angle_arr[mask])
         self.plot_curves[1].setData(t_plot[mask], vel_arr[mask])
         self.plot_curves[2].setData(t_plot[mask], cur_arr[mask])
         for pw in self.plot_widgets:
             pw.setLabel('bottom', 'Time (s)')
-
         # 扭矩传感器绘图
-        if self.torque_connected and self.torque_plot_data:
-            t0 = self.torque_plot_time[0]
-            t_plot = [t - t0 for t in self.torque_plot_time]
-            window = self.plot_window_spin.value()
-            t_now = t_plot[-1]
-            mask = [tt > t_now - window for tt in t_plot]
-            x = [tt for tt, m in zip(t_plot, mask) if m]
-            y = [yy for yy, m in zip(self.torque_plot_data, mask) if m]
-            self.torque_plot_curve.setData(x, y)
-        else:
-            self.torque_plot_curve.setData([], [])
+        if self.torque_plot_curve is not None:
+            if self.torque_connected and self.torque_plot_data:
+                t0 = self.torque_plot_time[0]
+                t_plot = [t - t0 for t in self.torque_plot_time]
+                window = self.plot_window_spin.value()
+                t_now = t_plot[-1]
+                mask = [tt > t_now - window for tt in t_plot]
+                x = [tt for tt, m in zip(t_plot, mask) if m]
+                y = [yy for yy, m in zip(self.torque_plot_data, mask) if m]
+                self.torque_plot_curve.setData(x, y)
+            else:
+                self.torque_plot_curve.setData([], [])
 
     def closeEvent(self, event):
         if self.serial_thread.running:
