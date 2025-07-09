@@ -1,8 +1,13 @@
+"""
+SafeMRC通信模块，提供与SafeMRC设备的通信功能
+"""
 import threading
 import time
 import serial
 import serial.tools.list_ports
 from PyQt5 import QtCore
+from error_handler import ErrorHandler, ErrorSeverity, logger
+from config import SAFEMRC_HEADER, RX_POLL_INTERVAL
 
 # CRC-CCITT查表法，与嵌入式C端完全一致
 CRC_CCITT_TABLE = [
@@ -39,211 +44,256 @@ CRC_CCITT_TABLE = [
     0xf78f, 0xe606, 0xd49d, 0xc514, 0xb1ab, 0xa022, 0x92b9, 0x8330,
     0x7bc7, 0x6a4e, 0x58d5, 0x495c, 0x3de3, 0x2c6a, 0x1ef1, 0x0f78
 ]
+
 def crc_ccitt(data, crc=0xFFFF):
+    """
+    计算CRC-CCITT校验值
+    
+    Args:
+        data: 需要计算CRC的字节数据
+        crc: 初始CRC值，默认为0xFFFF
+        
+    Returns:
+        int: 计算得到的CRC校验值
+    """
     for b in data:
         crc = ((crc >> 8) ^ CRC_CCITT_TABLE[(crc ^ b) & 0xFF]) & 0xFFFF
     return crc
 
 class SerialThread(QtCore.QThread):
+    """
+    SafeMRC串口通信线程类
+    
+    使用Qt的事件驱动模型实现与SafeMRC设备的异步通信，
+    避免阻塞主线程，提高UI响应性能
+    """
+    # 信号定义
     data_received = QtCore.pyqtSignal(dict)
     status_changed = QtCore.pyqtSignal(bool)
     error_signal = QtCore.pyqtSignal(str)
 
     def __init__(self):
+        """初始化SafeMRC通信线程"""
         super().__init__()
+        
+        # 通信参数
         self.ser = None
         self.running = False
         self.send_interval = 0.05  # default 20Hz
         self.mode = 0
         self.current = 0.0
         self.device_id = 1
+        
+        # 线程同步
         self.lock = QtCore.QMutex()
-        self._stop_event = False
+        self._stop_event = threading.Event()
         self._sending = False
+        
+        # 数据缓冲
         self._last_cmd = b''
-        self.rx_buffer = b''
+        self._last_send_time = 0
+        self._buffer = b''
         
-        # 创建发送定时器，但不要立即moveToThread，而是在run方法中创建
-        self.send_timer = None
-        self.last_send_time = 0
-        
-        # 发送频率监控
-        self.send_count = 0
-        self.last_send_count_time = 0
-        self.send_freq_monitor = True
-        
-        # 性能优化参数
-        self.ui_update_interval = 0.1  # 每100ms更新一次UI
-        self.last_ui_update_time = 0
-        self.batch_size = 1  # 默认每次发送1个命令
+        # 发送定时器
+        self._tx_timer = QtCore.QTimer()
+        self._tx_timer.moveToThread(self)
+        self._tx_timer.timeout.connect(self._send_command)
+
+        # 接收定时器
+        self._rx_timer = QtCore.QTimer()
+        self._rx_timer.moveToThread(self)
+        self._rx_timer.timeout.connect(self._poll_read)
 
     def configure(self, port, baudrate, send_interval, mode, current, device_id):
-        self.port = port
-        self.baudrate = baudrate
-        self.send_interval = send_interval
-        self.mode = mode
-        self.current = current
-        self.device_id = device_id
+        """
+        配置SafeMRC通信参数
+        
+        Args:
+            port: 串口名称
+            baudrate: 波特率
+            send_interval: 发送间隔 (秒)
+            mode: 工作模式
+            current: 电流值 (A)
+            device_id: 设备ID
+        """
+        with QtCore.QMutexLocker(self.lock):
+            self.port = port
+            self.baudrate = baudrate
+            self.send_interval = send_interval
+            self.mode = mode
+            self.current = current
+            self.device_id = device_id
+            
+        logger.info(f"SafeMRC配置: 端口={port}, 波特率={baudrate}, "
+                   f"频率={1/send_interval:.1f}Hz, 模式={mode}, "
+                   f"电流={current}A, ID={device_id}")
 
     def run(self):
+        """线程主函数，启动事件循环和定时器"""
         try:
-            print(f"SafeMRC: 尝试打开串口 {self.port}，波特率 {self.baudrate}")
-            # 添加更多串口配置参数
-            self.ser = serial.Serial(
-                port=self.port,
-                baudrate=self.baudrate,
-                bytesize=serial.EIGHTBITS,
-                parity=serial.PARITY_NONE,
-                stopbits=serial.STOPBITS_ONE,
-                timeout=0.1,
-                write_timeout=0.5
-            )
-            print(f"SafeMRC: 串口打开成功，配置: {self.ser}")
-            
+            # 打开串口
+            self.ser = serial.Serial(self.port, self.baudrate, timeout=0.1)
             self.running = True
-            self.rx_buffer = b''
             self.status_changed.emit(True)
-            
-            # 使用更可靠的时间控制方法
-            self.last_send_time = time.perf_counter()
-            self.last_send_count_time = time.perf_counter()
-            self.last_ui_update_time = time.perf_counter()
-            self.send_count = 0
-            
-            # 根据发送频率调整批处理大小
-            if 1.0/self.send_interval > 100:  # 如果频率高于100Hz
-                self.batch_size = max(1, int((1.0/self.send_interval) / 50))  # 每批最多发送频率/50个命令
-                print(f"SafeMRC: 高频率模式，批处理大小设为 {self.batch_size}")
-            
-            # 接收循环
-            while not self._stop_event:
-                try:
-                    # 定时发送
-                    current_time = time.perf_counter()
-                    if self._sending and current_time - self.last_send_time >= self.send_interval:
-                        # 高频率发送时，可能需要多次发送以赶上时间
-                        send_count_this_cycle = 0
-                        while self._sending and current_time - self.last_send_time >= self.send_interval and send_count_this_cycle < self.batch_size:
-                            self.send_command(update_ui=(send_count_this_cycle == 0 and current_time - self.last_ui_update_time >= self.ui_update_interval))
-                            self.last_send_time += self.send_interval  # 使用固定间隔，避免时间漂移
-                            self.send_count += 1
-                            send_count_this_cycle += 1
-                            
-                            # 更新UI时间
-                            if current_time - self.last_ui_update_time >= self.ui_update_interval:
-                                self.last_ui_update_time = current_time
-                        
-                        # 监控发送频率
-                        if self.send_freq_monitor and current_time - self.last_send_count_time >= 1.0:
-                            send_freq = self.send_count / (current_time - self.last_send_count_time)
-                            print(f"SafeMRC: 实际发送频率 {send_freq:.2f} Hz，目标频率 {1.0/self.send_interval:.2f} Hz")
-                            self.send_count = 0
-                            self.last_send_count_time = current_time
-                    
-                    # 处理接收
-                    if self.ser and self.ser.is_open and self.ser.in_waiting > 0:
-                        self.process_incoming_data()
-                        
-                    # 根据发送频率动态调整休眠时间，降低CPU占用
-                    sleep_time = min(1, max(0.5 * self.send_interval, 0.001))
-                    QtCore.QThread.msleep(int(sleep_time * 1000))
-                except Exception as e:
-                    import traceback
-                    traceback.print_exc()
-                    # 接收错误不中断线程，只记录
-                
+            logger.info(f"SafeMRC串口已打开: {self.port}")
         except Exception as e:
-            import traceback
-            msg = f'Failed to open serial port {self.port} at {self.baudrate} baud:\n{e}'
-            traceback.print_exc()
-            self.error_signal.emit(msg)
-        finally:
-            if self.send_timer:
-                self.send_timer.stop()
-            if self.ser and self.ser.is_open:
-                self.ser.close()
-            self.running = False
+            error_msg = f"无法打开串口 {self.port} (波特率: {self.baudrate})"
+            ErrorHandler.log_exception(e, error_msg)
+            self.error_signal.emit(f"{error_msg}:\n{str(e)}")
             self.status_changed.emit(False)
-
-    def send_command(self, update_ui=True):
-        """发送命令函数"""
-        if not self._sending or not self.running:
             return
+        
+        # 启动定时器
+        interval_ms = int(self.send_interval * 1000)
+        self._tx_timer.start(interval_ms)
+        self._rx_timer.start(RX_POLL_INTERVAL)
+        logger.info(f"SafeMRC通信定时器已启动: 发送间隔={interval_ms}ms, 接收轮询={RX_POLL_INTERVAL}ms")
+
+        # 进入Qt事件循环
+        self.exec_()
+
+        # 退出时清理资源
+        self._cleanup()
+
+    def _cleanup(self):
+        """清理资源并通知状态变化"""
+        # 停止定时器
+        if hasattr(self, '_tx_timer') and self._tx_timer.isActive():
+            self._tx_timer.stop()
+            
+        if hasattr(self, '_rx_timer') and self._rx_timer.isActive():
+            self._rx_timer.stop()
+            
+        # 关闭串口
+        if self.ser:
+            try:
+                if self.ser.is_open:
+                    self.ser.close()
+                    logger.info("SafeMRC串口已关闭")
+            except Exception as e:
+                ErrorHandler.log_exception(e, "关闭SafeMRC串口时出错", ErrorSeverity.WARNING)
+                
+        # 更新状态
+        self.running = False
+        self.status_changed.emit(False)
+
+    def _send_command(self):
+        """定时器触发的发送命令函数"""
+        if not self._sending or not self.ser or not self.ser.is_open:
+            return
+        
         try:
             with QtCore.QMutexLocker(self.lock):
                 cmd = self.pack_cmd(self.mode, self.current)
                 self._last_cmd = cmd
             
-            if self.ser and self.ser.is_open:
-                bytes_written = self.ser.write(cmd)
-                # 发送信号通知UI，但不是每次都更新，减少UI负担
-                if update_ui:
-                    self.data_received.emit({'raw_frame': cmd, 'direction': 'TX'})
-            else:
-                print(f"SafeMRC serial not open: ser={self.ser}, is_open={self.ser.is_open if self.ser else False}")
+            self.ser.write(cmd)
+            self._last_send_time = time.perf_counter()
+            
+            # 发送TX信号
+            self.data_received.emit({'raw_frame': cmd, 'direction': 'TX'})
         except Exception as e:
-            import traceback
-            print(f"SafeMRC send_command异常: {e}")
-            traceback.print_exc()
-            # 发送错误不中断线程，只记录
+            ErrorHandler.log_exception(e, "发送SafeMRC命令失败", ErrorSeverity.WARNING)
 
-    def process_incoming_data(self):
-        """处理接收到的数据"""
-        if not self.ser or not self.ser.is_open:
-            return
-            
-        buffer = self.ser.read(self.ser.in_waiting)
-        if not buffer:
-            return
-            
-        # 将新数据追加到接收缓冲区
-        self.rx_buffer += buffer
+    def _process_buffer(self):
+        """处理接收缓冲区数据"""
+        # 帧长度检查
+        FRAME_LENGTH = 17  # SafeMRC帧固定长度
         
-        # 查找并处理完整帧
-        while len(self.rx_buffer) >= 17:  # 最小完整帧长度
-            idx = self.rx_buffer.find(b'\xFE\xEE')
+        while len(self._buffer) >= FRAME_LENGTH:
+            # 查找帧头
+            idx = self._buffer.find(SAFEMRC_HEADER)
             if idx == -1:
-                self.rx_buffer = b''
+                # 没找到帧头，清空缓冲区
+                self._buffer = b''
                 break
-            if len(self.rx_buffer) - idx < 17:
-                self.rx_buffer = self.rx_buffer[idx:]
-                break
-                
-            frame = self.rx_buffer[idx:idx+17]
-            self.rx_buffer = self.rx_buffer[idx+17:]
             
+            if len(self._buffer) - idx < FRAME_LENGTH:
+                # 帧不完整，保留剩余数据等待下次处理
+                self._buffer = self._buffer[idx:]
+                break
+            
+            # 提取完整帧
+            frame = self._buffer[idx:idx+FRAME_LENGTH]
+            self._buffer = self._buffer[idx+FRAME_LENGTH:]  # 移除已处理的帧
+            
+            # 解析帧数据
             data = self.parse_feedback(frame)
             if data:
+                # 添加元数据
                 data['raw_frame'] = frame
                 data['direction'] = 'RX'
                 data['timestamp'] = time.perf_counter()  # 高精度时间戳
+                
+                # 发送数据信号
                 self.data_received.emit(data)
 
+    def _poll_read(self):
+        """定时器触发的数据接收函数"""
+        if not self.ser or not self.ser.is_open:
+            return
+            
+        try:
+            if self.ser.in_waiting:
+                new_data = self.ser.read(self.ser.in_waiting)
+                if new_data:
+                    self._buffer += new_data
+                    self._process_buffer()
+        except Exception as e:
+            ErrorHandler.log_exception(e, "读取SafeMRC数据失败", ErrorSeverity.WARNING)
+
     def stop(self):
-        self._stop_event = True
-        if self.send_timer:
-            self.send_timer.stop()
-        self.wait()
+        """安全停止线程"""
+        logger.info("正在停止SafeMRC通信线程...")
+        self._stop_event.set()
+        # 立即停止发送
+        self._sending = False
+        # 退出事件循环
+        QtCore.QMetaObject.invokeMethod(self, 'quit')
+        # 等待线程结束
+        if not self.wait(1000):
+            logger.warning("SafeMRC通信线程未能在1秒内停止")
+        else:
+            logger.info("SafeMRC通信线程已停止")
 
     def update_params(self, send_interval, mode, current, device_id):
+        """
+        更新通信参数
+        
+        Args:
+            send_interval: 发送间隔 (秒)
+            mode: 工作模式
+            current: 电流值 (A)
+            device_id: 设备ID
+        """
         with QtCore.QMutexLocker(self.lock):
             self.send_interval = send_interval
             self.mode = mode
             self.current = current
             self.device_id = device_id
             
-        # 更新发送定时器间隔
-        if self.running:
-            # interval_ms = int(self.send_interval * 1000) # This line is no longer needed
-            # self.send_timer.setInterval(interval_ms) # This line is no longer needed
-            pass # The send_command will now use the new time control logic
+            # 更新定时器间隔
+            if self._tx_timer.isActive():
+                interval_ms = round(send_interval * 1000)
+                self._tx_timer.setInterval(interval_ms)
+                logger.info(f"SafeMRC发送间隔已更新: {interval_ms}ms ({1/send_interval:.1f}Hz)")
 
     def pack_cmd(self, mode, current):
+        """
+        打包SafeMRC命令帧
+        
+        Args:
+            mode: 工作模式
+            current: 电流值 (A)
+            
+        Returns:
+            bytes: 打包后的命令帧
+        """
         # Command protocol: 0xFE 0xEE id(1) mode(1) current(int32, 4 bytes) CRC(2)
-        head = b'\xFE\xEE'
+        head = SAFEMRC_HEADER
         id_byte = self.device_id.to_bytes(1, 'little')
         mode_byte = mode.to_bytes(1, 'little')
-        cur = int(current * 1000)
+        cur = int(current * 1000)  # 转换为mA
         cur_bytes = cur.to_bytes(4, 'little', signed=True)  # int32_t, little-endian
         payload = head + id_byte + mode_byte + cur_bytes
         crc = crc_ccitt(payload)
@@ -251,18 +301,34 @@ class SerialThread(QtCore.QThread):
         return payload + crc_bytes
 
     def parse_feedback(self, frame):
+        """
+        解析SafeMRC反馈帧
+        
+        Args:
+            frame: 接收到的帧数据
+            
+        Returns:
+            dict: 解析后的数据字典，解析失败时返回None
+        """
         # Feedback: 0xFE 0xEE id(1) mode(1) collision(1) encoder(4) velocity(4) current(2) CRC(2)
         try:
-            if frame[0] != 0xFE or frame[1] != 0xEE:
+            # 帧头检查
+            if len(frame) < 17 or frame[0] != 0xFE or frame[1] != 0xEE:
                 return None
+                
+            # 提取字段
             id_ = frame[2]
             mode = frame[3]
             collision = frame[4]
             encoder = int.from_bytes(frame[5:9], 'little', signed=True) / 65535.0
             velocity = int.from_bytes(frame[9:13], 'little', signed=True) / 1000.0
             current = int.from_bytes(frame[13:15], 'little', signed=True) / 1000.0
+            
+            # CRC校验
             crc_recv = int.from_bytes(frame[15:17], 'little')
             crc_calc = crc_ccitt(frame[:15])
+            
+            # 返回解析结果
             return {
                 'id': id_,
                 'mode': mode,
@@ -273,18 +339,31 @@ class SerialThread(QtCore.QThread):
                 'crc_recv': crc_recv,
                 'crc_calc': crc_calc
             }
-        except Exception:
+        except Exception as e:
+            ErrorHandler.log_exception(e, "解析SafeMRC反馈帧失败", ErrorSeverity.WARNING)
             return None
 
     def enable_sending(self, enable):
-        print(f"SafeMRC: {'启用' if enable else '禁用'}发送，当前状态: _sending={self._sending}, running={self.running}")
-        with QtCore.QMutexLocker(self.lock):
-            self._sending = enable
+        """
+        启用或禁用命令发送
         
-        # 如果启用发送，重置发送时间
-        if enable and self.running:
-            self.last_send_time = time.perf_counter() - self.send_interval  # 确保立即发送一次
+        Args:
+            enable: 是否启用发送
+        """
+        with QtCore.QMutexLocker(self.lock):
+            was_sending = self._sending
+            self._sending = enable
+            if not was_sending and enable:
+                logger.info("SafeMRC命令发送已启用")
+            elif was_sending and not enable:
+                logger.info("SafeMRC命令发送已禁用")
     
     @staticmethod
     def get_available_ports():
+        """
+        获取可用串口列表
+        
+        Returns:
+            list: 可用串口名称列表
+        """
         return [p.device for p in serial.tools.list_ports.comports()] 

@@ -48,15 +48,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._init_data_buffers()
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update_plots)
-        self.timer.start(30)  # 默认30ms更新一次图表
+        self.timer.start(30)
         self.connected = False
         self.last_data_time = time.time()
-        
-        # 性能优化参数
-        self.plot_update_interval = 30  # 默认30ms更新一次图表
-        self.plot_downsampling = False  # 是否启用降采样
-        self.plot_max_points_visible = 500  # 最大可见点数
-        self.data_batch = []  # 数据批处理缓冲区
 
     def _setup_ui(self):
         central = QtWidgets.QWidget()
@@ -237,40 +231,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.torque_plot_time = []
         self.torque_plot_ptr = 0
         self.torque_plot_max_points = 2000
+        # self.torque_plot_curve = None  # 不要重置UI对象
+        # self.torque_plot_widget = None
+        # self.torque_status_label = None
         self.torque_recording = False
         self.torque_csv_field = False
-        
-        # 根据通信频率调整绘图参数
-        self.adjust_plot_params()
-        
-    def adjust_plot_params(self):
-        """根据通信频率调整绘图参数"""
-        freq = self.freq_spin.value() if hasattr(self, 'freq_spin') else 20
-        torque_freq = self.torque_freq_spin.value() if hasattr(self, 'torque_freq_spin') else 1000
-        
-        # 根据频率调整绘图更新间隔
-        max_freq = max(freq, torque_freq)
-        if max_freq <= 50:
-            self.plot_update_interval = 30  # 30ms，约33Hz
-            self.plot_downsampling = False
-            self.plot_max_points_visible = 500
-        elif max_freq <= 200:
-            self.plot_update_interval = 50  # 50ms，约20Hz
-            self.plot_downsampling = True
-            self.plot_max_points_visible = 300
-        elif max_freq <= 500:
-            self.plot_update_interval = 100  # 100ms，约10Hz
-            self.plot_downsampling = True
-            self.plot_max_points_visible = 200
-        else:
-            self.plot_update_interval = 200  # 200ms，约5Hz
-            self.plot_downsampling = True
-            self.plot_max_points_visible = 100
-            
-        # 更新定时器间隔
-        if hasattr(self, 'timer'):
-            self.timer.setInterval(self.plot_update_interval)
-            print(f"调整绘图更新间隔为 {self.plot_update_interval}ms，降采样：{self.plot_downsampling}，最大可见点数：{self.plot_max_points_visible}")
 
     def refresh_ports(self):
         self.port_combo.clear()
@@ -296,30 +261,19 @@ class MainWindow(QtWidgets.QMainWindow):
         mode = self.mode_combo.currentData()
         current = self.current_spin.value()
         device_id = self.id_spin.value()
-        print(f"SafeMRC: 连接到端口 {port}，波特率 {baudrate}，发送频率 {freq}Hz")
-        
-        # 先测试串口是否可用
         try:
-            import serial
-            test_ser = serial.Serial(port, baudrate, timeout=0.5, write_timeout=0.5)
-            print(f"SafeMRC: 测试串口连接成功: {test_ser}")
-            test_data = b'\xFE\xEE\x01\x00\x00\x00\x00\x00\x00\x00'  # 简单的测试数据
-            bytes_written = test_ser.write(test_data)
-            print(f"SafeMRC: 测试发送成功，已发送 {bytes_written} 字节")
-            test_ser.close()
-        except Exception as e:
-            import traceback
-            print(f"SafeMRC: 测试串口失败: {e}")
-            traceback.print_exc()
-            QtWidgets.QMessageBox.critical(self, 'Serial Test Error', f'Failed to test serial port:\n{e}')
-            return
-            
-        self.serial_thread.configure(port, baudrate, send_interval, mode, current, device_id)
-        try:
+            if self.serial_thread.isRunning():
+                self.serial_thread.stop()
+            self.serial_thread = SerialThread()
+            self.serial_thread.data_received.connect(self.on_data_received)
+            self.serial_thread.status_changed.connect(self.on_status_changed)
+            self.serial_thread.error_signal.connect(self.show_serial_error)
+            self.serial_thread.configure(port, baudrate, send_interval, mode, current, device_id)
             self.serial_thread.start()
             self.connect_btn.setEnabled(False)
             self.disconnect_btn.setEnabled(True)
             self.start_btn.setEnabled(True)
+            self.refresh_btn.setEnabled(False)
         except Exception as e:
             import traceback
             QtWidgets.QMessageBox.critical(self, 'Serial Error', f'Failed to start serial thread:\n{e}')
@@ -329,65 +283,35 @@ class MainWindow(QtWidgets.QMainWindow):
             self.disconnect_btn.setEnabled(False)
             self.start_btn.setEnabled(False)
 
-    def _update_params(self):
-        if self.connected:
-            freq = self.freq_spin.value()
-            send_interval = 1.0 / freq
-            mode = self.mode_combo.currentData()
-            current = self.current_spin.value()
-            device_id = self.id_spin.value()
-            self.serial_thread.update_params(send_interval, mode, current, device_id)
-            
-            # 更新绘图参数
-            self.adjust_plot_params()
-
     def connect_torque(self):
         port = self.torque_port_combo.currentText()
         baud = int(self.torque_baud_combo.currentText())
         freq = self.torque_freq_spin.value()
-        print(f"扭矩传感器: 连接到端口 {port}，波特率 {baud}，采样频率 {freq}Hz")
-        
-        # 先测试串口是否可用
-        try:
-            import serial
-            test_ser = serial.Serial(port, baud, timeout=0.5, write_timeout=0.5)
-            print(f"扭矩传感器: 测试串口连接成功: {test_ser}")
-            test_data = bytes([0x01, 0x03, 0x00, 0x1E, 0x00, 0x02, 0xA4, 0x0D])  # 简单的测试数据
-            bytes_written = test_ser.write(test_data)
-            print(f"扭矩传感器: 测试发送成功，已发送 {bytes_written} 字节")
-            test_ser.close()
-        except Exception as e:
-            import traceback
-            print(f"扭矩传感器: 测试串口失败: {e}")
-            traceback.print_exc()
-            QtWidgets.QMessageBox.critical(self, 'Torque Sensor Test Error', f'Failed to test serial port:\n{e}')
-            return
-            
+        if self.torque_thread.isRunning():
+            self.torque_thread.stop()
+        self.torque_thread = TorqueSensorThread()
+        self.torque_thread.data_received.connect(self.on_torque_data)
+        self.torque_thread.status_changed.connect(self.on_torque_status)
+        self.torque_thread.error_signal.connect(self.on_torque_error)
         self.torque_thread.configure(port, baud, freq)
-        try:
-            self.torque_thread.start()
-            self.torque_connect_btn.setEnabled(False)
-            self.torque_disconnect_btn.setEnabled(True)
-            self.torque_start_btn.setEnabled(True)
-            self.torque_stop_btn.setEnabled(False)
-            self.torque_connected = True
-            if self.torque_status_label is not None:
-                self.torque_status_label.setText('Connected')
-        except Exception as e:
-            import traceback
-            QtWidgets.QMessageBox.critical(self, 'Torque Sensor Error', f'Failed to connect torque sensor:\n{e}')
-            print('Torque thread start error:', e)
-            traceback.print_exc()
-            self.torque_connected = False
-            if self.torque_status_label is not None:
-                self.torque_status_label.setText('Connection failed')
+        self.torque_connect_btn.setEnabled(False)
+        self.torque_disconnect_btn.setEnabled(True)
+        self.torque_start_btn.setEnabled(True)
+        self.torque_stop_btn.setEnabled(False)
+        self.torque_connected = True
+        if self.torque_status_label is not None:
+            self.torque_status_label.setText('Connected')
+        self.refresh_torque_ports_btn.setEnabled(False)
 
     def disconnect_serial(self):
-        self.serial_thread.stop()
+        if self.serial_thread.isRunning():
+            self.serial_thread.stop()
+        self.serial_thread = SerialThread()  # fresh instance for next connect
         self.connect_btn.setEnabled(True)
         self.disconnect_btn.setEnabled(False)
         self.start_btn.setEnabled(False)
         self.start_btn.setChecked(False)
+        self.refresh_btn.setEnabled(True)
 
     def disconnect_torque(self):
         self.stop_torque_sampling()
@@ -398,6 +322,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.torque_connected = False
         if self.torque_status_label is not None:
             self.torque_status_label.setText('Not connected')
+        self.torque_csv_field = False
+        self.refresh_torque_ports_btn.setEnabled(True)
 
     def on_status_changed(self, ok):
         self.connected = ok
@@ -454,23 +380,15 @@ class MainWindow(QtWidgets.QMainWindow):
                     'raw_frame_hex': ' '.join(f'{b:02X}' for b in data['raw_frame'])
                 }
                 if self.torque_recording and self.torque_plot_data:
-                    # 找到最接近当前时间的扭矩数据点
-                    closest_idx = self.find_closest_torque_data(msg_time)
-                    if closest_idx >= 0:
-                        record_row['torque'] = self.torque_plot_data[closest_idx]
+                    record_row['torque'] = self.torque_plot_data[-1]
                 self.record_data.append(record_row)
-            
-            # 更新UI标签，但不是每次都更新
-            if not hasattr(self, 'last_label_update_time') or time.perf_counter() - self.last_label_update_time > 0.1:
-                self.fbk_labels['CRC (recv)'].setText(f"0x{data['crc_recv']:04X}")
-                self.fbk_labels['CRC (calc)'].setText(f"0x{data['crc_calc']:04X}")
-                self.fbk_labels['Current (A)'].setText(f"{data['current']:.3f}")
-                self.fbk_labels['Mode'].setText(self.MODES.get(data['mode'], str(data['mode'])))
-                self.fbk_labels['Encoder Angle (rad)'].setText(f"{data['encoder']:.6f}")
-                self.fbk_labels['Encoder Velocity (rad/s)'].setText(f"{data['velocity']:.6f}")
-                self.fbk_labels['Collision'].setText('Yes' if data['collision'] else 'No')
-                self.last_label_update_time = time.perf_counter()
-                
+            self.fbk_labels['CRC (recv)'].setText(f"0x{data['crc_recv']:04X}")
+            self.fbk_labels['CRC (calc)'].setText(f"0x{data['crc_calc']:04X}")
+            self.fbk_labels['Current (A)'].setText(f"{data['current']:.3f}")
+            self.fbk_labels['Mode'].setText(self.MODES.get(data['mode'], str(data['mode'])))
+            self.fbk_labels['Encoder Angle (rad)'].setText(f"{data['encoder']:.6f}")
+            self.fbk_labels['Encoder Velocity (rad/s)'].setText(f"{data['velocity']:.6f}")
+            self.fbk_labels['Collision'].setText('Yes' if data['collision'] else 'No')
             # Store data for plotting
             t = msg_time
             idx = self.data_ptr % self.max_points
@@ -481,27 +399,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.data_ptr += 1
             self.data_count = min(self.data_count + 1, self.max_points)
             self.last_data_time = t
-
-    def find_closest_torque_data(self, target_time):
-        """找到时间戳最接近目标时间的扭矩数据索引"""
-        if not self.torque_plot_time:
-            return -1
-        
-        # 找到最接近的时间点
-        closest_idx = 0
-        min_diff = abs(self.torque_plot_time[0] - target_time)
-        
-        for i, t in enumerate(self.torque_plot_time):
-            diff = abs(t - target_time)
-            if diff < min_diff:
-                min_diff = diff
-                closest_idx = i
-        
-        # 如果时间差太大（例如超过采样周期的2倍），可能意味着没有合适的数据点
-        if min_diff > (2.0 / self.torque_freq_spin.value()):
-            return -1
-        
-        return closest_idx
 
     def on_torque_data(self, timestamp, torque):
         # 只有采集线程在运行时才更新数据
@@ -526,43 +423,24 @@ class MainWindow(QtWidgets.QMainWindow):
                 angle_arr = self.data_angle[:self.data_count]
                 vel_arr = self.data_velocity[:self.data_count]
                 cur_arr = self.data_current[:self.data_count]
-                t_now = t_arr[-1] if len(t_arr) > 0 else 0
+                t_now = t_arr[-1]
             else:
                 idx = self.data_ptr % self.max_points
                 t_arr = np.concatenate((self.data_time[idx:], self.data_time[:idx]))
                 angle_arr = np.concatenate((self.data_angle[idx:], self.data_angle[:idx]))
                 vel_arr = np.concatenate((self.data_velocity[idx:], self.data_velocity[:idx]))
                 cur_arr = np.concatenate((self.data_current[idx:], self.data_current[:idx]))
-                t_now = t_arr[-1] if len(t_arr) > 0 else 0
-                
+                t_now = t_arr[-1]
             # Use plot_time_zero for x axis
             if self.plot_time_zero is not None:
                 t_plot = t_arr - self.plot_time_zero
             else:
                 t_plot = t_arr
-                
-            # 只显示时间窗口内的数据
             mask = (t_arr > t_now - self.plot_window)
             if np.any(mask):
-                # 应用掩码获取可见数据
-                visible_t = t_plot[mask]
-                visible_angle = angle_arr[mask]
-                visible_vel = vel_arr[mask]
-                visible_cur = cur_arr[mask]
-                
-                # 如果启用降采样且数据点过多，则进行降采样
-                if self.plot_downsampling and len(visible_t) > self.plot_max_points_visible:
-                    step = max(1, len(visible_t) // self.plot_max_points_visible)
-                    visible_t = visible_t[::step]
-                    visible_angle = visible_angle[::step]
-                    visible_vel = visible_vel[::step]
-                    visible_cur = visible_cur[::step]
-                
-                # 更新图表
-                self.plot_curves[0].setData(visible_t, visible_angle)
-                self.plot_curves[1].setData(visible_t, visible_vel)
-                self.plot_curves[2].setData(visible_t, visible_cur)
-                
+                self.plot_curves[0].setData(t_plot[mask], angle_arr[mask])
+                self.plot_curves[1].setData(t_plot[mask], vel_arr[mask])
+                self.plot_curves[2].setData(t_plot[mask], cur_arr[mask])
                 for pw in self.plot_widgets:
                     pw.setLabel('bottom', 'Time (s)')
             else:
@@ -575,27 +453,14 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # ---------- 扭矩传感器绘图 ----------
         if self.torque_plot_curve is not None and self.torque_plot_data:
-            if len(self.torque_plot_time) > 0:
-                t0 = self.torque_plot_time[0]
-                t_plot = [t - t0 for t in self.torque_plot_time]
-                window = self.plot_window_spin.value()
-                t_now = t_plot[-1] if t_plot else 0
-                
-                # 只显示时间窗口内的数据
-                visible_data = [(t, y) for t, y in zip(t_plot, self.torque_plot_data) if t > t_now - window]
-                
-                # 如果启用降采样且数据点过多，则进行降采样
-                if self.plot_downsampling and len(visible_data) > self.plot_max_points_visible:
-                    step = max(1, len(visible_data) // self.plot_max_points_visible)
-                    visible_data = visible_data[::step]
-                
-                if visible_data:
-                    x, y = zip(*visible_data)
-                    self.torque_plot_curve.setData(x, y)
-                else:
-                    self.torque_plot_curve.setData([], [])
-            else:
-                self.torque_plot_curve.setData([], [])
+            t0 = self.torque_plot_time[0]
+            t_plot = [t - t0 for t in self.torque_plot_time]
+            window = self.plot_window_spin.value()
+            t_now = t_plot[-1]
+            mask = [tt > t_now - window for tt in t_plot]
+            x = [tt for tt, m in zip(t_plot, mask) if m]
+            y = [yy for yy, m in zip(self.torque_plot_data, mask) if m]
+            self.torque_plot_curve.setData(x, y)
         else:
             if self.torque_plot_curve is not None:
                 self.torque_plot_curve.setData([], [])
@@ -606,6 +471,16 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.torque_thread.running:
             self.torque_thread.stop()
         event.accept()
+
+    # Update parameters when user changes them
+    def _update_params(self):
+        if self.connected:
+            freq = self.freq_spin.value()
+            send_interval = 1.0 / freq
+            mode = self.mode_combo.currentData()
+            current = self.current_spin.value()
+            device_id = self.id_spin.value()
+            self.serial_thread.update_params(send_interval, mode, current, device_id)
 
     # Connect parameter changes to update
     def showEvent(self, event):
@@ -626,12 +501,9 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         if self.start_btn.isChecked():
             self.start_btn.setText('Stop Sending')
-            print("SafeMRC: 启用发送，当前模式:", self.MODES.get(self.mode_combo.currentData(), "未知"))
-            print(f"SafeMRC: 当前参数 - 频率:{self.freq_spin.value()}Hz, 电流:{self.current_spin.value()}A, ID:{self.id_spin.value()}")
             self.serial_thread.enable_sending(True)
         else:
             self.start_btn.setText('Start Sending')
-            print("SafeMRC: 禁用发送")
             self.serial_thread.enable_sending(False)
 
     def append_hex_log(self, direction, frame_bytes):
@@ -694,22 +566,17 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def start_torque_sampling(self):
         if not self.torque_connected:
-            print("扭矩传感器未连接，无法启动采样")
             return
         if self.torque_plot_curve is None:
             QtWidgets.QMessageBox.warning(self, 'Warning', 'Torque plot window not ready, please wait for UI to load.')
             return
         if not self.torque_thread.isRunning():
-            print("扭矩传感器线程未运行，正在启动...")
             self.torque_thread._stop_event = False
             self.torque_thread.start()
-        print("扭矩传感器: 启用采样")
-        self.torque_thread.enable_sampling(True)  # 启用采样
         self.torque_start_btn.setEnabled(False)
         self.torque_stop_btn.setEnabled(True)
 
     def stop_torque_sampling(self):
-        self.torque_thread.enable_sampling(False)  # 禁用采样
         if self.torque_thread.isRunning():
             self.torque_thread.stop()
         self.torque_start_btn.setEnabled(True)
