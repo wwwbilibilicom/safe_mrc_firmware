@@ -261,6 +261,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 if self.record_start_time is None:
                     self.record_start_time = msg_time
                 timestamp = msg_time - self.record_start_time
+                torque_for_record = self.torque_value if self.torque_connected else 0.0
                 self.record_data.append({
                     'timestamp': timestamp,
                     'encoder': data.get('encoder'),
@@ -270,7 +271,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     'collision': data.get('collision'),
                     'crc_recv': data.get('crc_recv'),
                     'crc_calc': data.get('crc_calc'),
-                    'torque': self.torque_value,
+                    'torque': torque_for_record,
                     'raw_frame_hex': ' '.join(f'{b:02X}' for b in data['raw_frame'])
                 })
             self.fbk_labels['CRC (recv)'].setText(f"0x{data['crc_recv']:04X}")
@@ -291,32 +292,31 @@ class MainWindow(QtWidgets.QMainWindow):
             self.last_data_time = t
 
     def update_all(self):
-        # SafeMRC数据由串口线程异步推送，扭矩传感器同步采样
-        # 采样频率由freq_spin控制
-        # 采样时间戳
         t_now = time.perf_counter()
-        # 采集扭矩传感器
-        torque = 0.0
+        idx = self.data_ptr % self.max_points
+        # SafeMRC数据由on_data_received推进data_ptr
+        # 扭矩传感器采样
+        torque_sampled = False
+        torque = self.torque_value  # 默认保持上一个值
         if self.torque_connected:
             try:
-                torque = self.torque_sensor.read_torque()
+                t_val = self.torque_sensor.read_torque()
+                # 只有采集到有效数据才更新
+                if t_val is not None and isinstance(t_val, (int, float)):
+                    torque = t_val
+                    self.torque_value = torque
+                    self.data_torque[idx] = torque
+                    self.torque_val_label.setText(f'Torque: {torque:.4f} Nm')
+                    torque_sampled = True
             except Exception:
-                torque = 0.0
-        self.torque_value = torque
-        self.torque_val_label.setText(f'Torque: {torque:.4f} Nm')
-        # SafeMRC数据（最新一帧）
-        idx = self.data_ptr % self.max_points
-        # 时间同步
-        if self.plot_time_zero is None:
-            self.plot_time_zero = t_now
-        t_plot = t_now - self.plot_time_zero
-        # 只在有新SafeMRC数据时推进指针
-        # 这里假设on_data_received会推进data_ptr
-        # 但扭矩数据每tick都采集，保证同步
-        # 更新扭矩数据
-        self.data_torque[idx] = torque
-        # 更新绘图
-        self.update_plots()
+                pass
+        else:
+            self.torque_val_label.setText('Torque: -- Nm')
+        # 只有采样到新扭矩数据时才刷新plot
+        if torque_sampled:
+            self.update_plots()
+        # 如果SafeMRC数据推进了data_ptr但扭矩未采样到新值，保持上一个扭矩值
+        # 录制数据时未连接扭矩传感器仍然写0（在on_data_received里处理）
 
     def update_plots(self):
         self.plot_window = self.plot_window_spin.value()
