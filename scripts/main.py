@@ -386,25 +386,21 @@ class MainWindow(QtWidgets.QMainWindow):
     def on_torque_data(self, timestamp, torque):
         # 只有采集线程在运行时才更新数据
         if not self.torque_thread.isRunning():
+            print('Torque thread not running, skip data')
             return
         if not self.torque_connected:
+            print('Torque not connected, skip data')
             return
-        print(f'Received torque: {torque}')  # 调试输出
+        if self.torque_plot_curve is None:
+            print('Warning: torque_plot_curve is None!')
+        print(f'Received torque: {torque}, Plot data length before: {len(self.torque_plot_data)}')
         if len(self.torque_plot_data) >= self.torque_plot_max_points:
             self.torque_plot_data = self.torque_plot_data[1:]
             self.torque_plot_time = self.torque_plot_time[1:]
         self.torque_plot_data.append(torque)
         self.torque_plot_time.append(timestamp)
-        # 立即刷新图像（可选，提升响应）
-        if self.torque_plot_curve is not None:
-            t0 = self.torque_plot_time[0]
-            t_plot = [t - t0 for t in self.torque_plot_time]
-            window = self.plot_window_spin.value()
-            t_now = t_plot[-1]
-            mask = [tt > t_now - window for tt in t_plot]
-            x = [tt for tt, m in zip(t_plot, mask) if m]
-            y = [yy for yy, m in zip(self.torque_plot_data, mask) if m]
-            self.torque_plot_curve.setData(x, y)
+        print(f'Plot data length after: {len(self.torque_plot_data)}')
+        # 不直接刷新图像，交给update_plots统一处理
 
     def update_plots(self):
         self.plot_window = self.plot_window_spin.value()
@@ -434,7 +430,7 @@ class MainWindow(QtWidgets.QMainWindow):
             for curve in self.plot_curves:
                 curve.setData([], [])
             # 扭矩传感器绘图保护
-            if self.torque_plot_curve is not None:
+            if self.torque_plot_curve is not None and self.torque_plot_data:
                 self.torque_plot_curve.setData([], [])
             return
         self.plot_curves[0].setData(t_plot[mask], angle_arr[mask])
@@ -443,18 +439,15 @@ class MainWindow(QtWidgets.QMainWindow):
         for pw in self.plot_widgets:
             pw.setLabel('bottom', 'Time (s)')
         # 扭矩传感器绘图
-        if self.torque_plot_curve is not None:
-            if self.torque_connected and self.torque_plot_data:
-                t0 = self.torque_plot_time[0]
-                t_plot = [t - t0 for t in self.torque_plot_time]
-                window = self.plot_window_spin.value()
-                t_now = t_plot[-1]
-                mask = [tt > t_now - window for tt in t_plot]
-                x = [tt for tt, m in zip(t_plot, mask) if m]
-                y = [yy for yy, m in zip(self.torque_plot_data, mask) if m]
-                self.torque_plot_curve.setData(x, y)
-            else:
-                self.torque_plot_curve.setData([], [])
+        if self.torque_plot_curve is not None and self.torque_plot_data:
+            t0 = self.torque_plot_time[0]
+            t_plot = [t - t0 for t in self.torque_plot_time]
+            window = self.plot_window_spin.value()
+            t_now = t_plot[-1]
+            mask = [tt > t_now - window for tt in t_plot]
+            x = [tt for tt, m in zip(t_plot, mask) if m]
+            y = [yy for yy, m in zip(self.torque_plot_data, mask) if m]
+            self.torque_plot_curve.setData(x, y)
 
     def closeEvent(self, event):
         if self.serial_thread.running:
