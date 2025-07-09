@@ -29,6 +29,12 @@ class TorqueSensorThread(QtCore.QThread):
         self.send_count = 0
         self.last_send_count_time = 0
         self.send_freq_monitor = True
+        
+        # 性能优化参数
+        self.ui_update_interval = 0.1  # 每100ms更新一次UI
+        self.last_ui_update_time = 0
+        self.batch_size = 1  # 默认每次发送1个命令
+        self.data_buffer = []  # 数据缓冲区，用于批量处理
 
     def configure(self, port, baudrate, freq):
         self.port = port
@@ -63,10 +69,17 @@ class TorqueSensorThread(QtCore.QThread):
             # 使用更可靠的时间控制方法
             self.last_send_time = time.perf_counter()
             self.last_send_count_time = time.perf_counter()
+            self.last_ui_update_time = time.perf_counter()
             self.send_count = 0
+            self.data_buffer = []
             
             # 预先准备好发送数据，避免重复创建
             self.awake_cmd = bytes([0x01, 0x03, 0x00, 0x1E, 0x00, 0x02, 0xA4, 0x0D])
+            
+            # 根据发送频率调整批处理大小
+            if self.freq > 100:  # 如果频率高于100Hz
+                self.batch_size = max(1, int(self.freq / 50))  # 每批最多发送频率/50个命令
+                print(f"扭矩传感器: 高频率模式({self.freq}Hz)，批处理大小设为 {self.batch_size}")
             
             # 接收循环
             while not self._stop_event:
@@ -75,10 +88,12 @@ class TorqueSensorThread(QtCore.QThread):
                     current_time = time.perf_counter()
                     if self._sampling and current_time - self.last_send_time >= self.send_interval:
                         # 高频率发送时，可能需要多次发送以赶上时间
-                        while self._sampling and current_time - self.last_send_time >= self.send_interval:
+                        send_count_this_cycle = 0
+                        while self._sampling and current_time - self.last_send_time >= self.send_interval and send_count_this_cycle < self.batch_size:
                             self.send_command()
                             self.last_send_time += self.send_interval  # 使用固定间隔，避免时间漂移
                             self.send_count += 1
+                            send_count_this_cycle += 1
                         
                         # 监控发送频率
                         if self.send_freq_monitor and current_time - self.last_send_count_time >= 1.0:
@@ -90,6 +105,15 @@ class TorqueSensorThread(QtCore.QThread):
                     # 处理接收
                     if self.ser and self.ser.is_open and self.ser.in_waiting > 0:
                         self.process_incoming_data()
+                        
+                    # 发送缓冲的数据到UI
+                    if self.data_buffer and current_time - self.last_ui_update_time >= self.ui_update_interval:
+                        # 只发送最新的数据点
+                        if len(self.data_buffer) > 1:
+                            timestamp, torque = self.data_buffer[-1]
+                            self.data_received.emit(timestamp, torque)
+                        self.data_buffer = []
+                        self.last_ui_update_time = current_time
                         
                     # 根据发送频率动态调整休眠时间，降低CPU占用
                     sleep_time = min(1, max(0.5 * self.send_interval, 0.001))
@@ -145,9 +169,9 @@ class TorqueSensorThread(QtCore.QThread):
                     U_DATA = self.rx_buffer[i + 6]
                     U_DATA |= self.rx_buffer[i + 5] << 8
                     torque = self.hex2dec(U_DATA) / 30.0
-                    # 发送信号通知UI
+                    # 添加到数据缓冲区，而不是直接发送
                     timestamp = time.perf_counter()
-                    self.data_received.emit(timestamp, torque)
+                    self.data_buffer.append((timestamp, torque))
                     break
             
             # 清空接收缓冲区，准备下一次接收

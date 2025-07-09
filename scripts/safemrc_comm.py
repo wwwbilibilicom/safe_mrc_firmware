@@ -71,6 +71,11 @@ class SerialThread(QtCore.QThread):
         self.send_count = 0
         self.last_send_count_time = 0
         self.send_freq_monitor = True
+        
+        # 性能优化参数
+        self.ui_update_interval = 0.1  # 每100ms更新一次UI
+        self.last_ui_update_time = 0
+        self.batch_size = 1  # 默认每次发送1个命令
 
     def configure(self, port, baudrate, send_interval, mode, current, device_id):
         self.port = port
@@ -102,7 +107,13 @@ class SerialThread(QtCore.QThread):
             # 使用更可靠的时间控制方法
             self.last_send_time = time.perf_counter()
             self.last_send_count_time = time.perf_counter()
+            self.last_ui_update_time = time.perf_counter()
             self.send_count = 0
+            
+            # 根据发送频率调整批处理大小
+            if 1.0/self.send_interval > 100:  # 如果频率高于100Hz
+                self.batch_size = max(1, int((1.0/self.send_interval) / 50))  # 每批最多发送频率/50个命令
+                print(f"SafeMRC: 高频率模式，批处理大小设为 {self.batch_size}")
             
             # 接收循环
             while not self._stop_event:
@@ -111,10 +122,16 @@ class SerialThread(QtCore.QThread):
                     current_time = time.perf_counter()
                     if self._sending and current_time - self.last_send_time >= self.send_interval:
                         # 高频率发送时，可能需要多次发送以赶上时间
-                        while self._sending and current_time - self.last_send_time >= self.send_interval:
-                            self.send_command()
+                        send_count_this_cycle = 0
+                        while self._sending and current_time - self.last_send_time >= self.send_interval and send_count_this_cycle < self.batch_size:
+                            self.send_command(update_ui=(send_count_this_cycle == 0 and current_time - self.last_ui_update_time >= self.ui_update_interval))
                             self.last_send_time += self.send_interval  # 使用固定间隔，避免时间漂移
                             self.send_count += 1
+                            send_count_this_cycle += 1
+                            
+                            # 更新UI时间
+                            if current_time - self.last_ui_update_time >= self.ui_update_interval:
+                                self.last_ui_update_time = current_time
                         
                         # 监控发送频率
                         if self.send_freq_monitor and current_time - self.last_send_count_time >= 1.0:
@@ -148,7 +165,7 @@ class SerialThread(QtCore.QThread):
             self.running = False
             self.status_changed.emit(False)
 
-    def send_command(self):
+    def send_command(self, update_ui=True):
         """发送命令函数"""
         if not self._sending or not self.running:
             return
@@ -159,8 +176,9 @@ class SerialThread(QtCore.QThread):
             
             if self.ser and self.ser.is_open:
                 bytes_written = self.ser.write(cmd)
-                # 发送信号通知UI
-                self.data_received.emit({'raw_frame': cmd, 'direction': 'TX'})
+                # 发送信号通知UI，但不是每次都更新，减少UI负担
+                if update_ui:
+                    self.data_received.emit({'raw_frame': cmd, 'direction': 'TX'})
             else:
                 print(f"SafeMRC serial not open: ser={self.ser}, is_open={self.ser.is_open if self.ser else False}")
         except Exception as e:

@@ -48,9 +48,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self._init_data_buffers()
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update_plots)
-        self.timer.start(30)
+        self.timer.start(30)  # 默认30ms更新一次图表
         self.connected = False
         self.last_data_time = time.time()
+        
+        # 性能优化参数
+        self.plot_update_interval = 30  # 默认30ms更新一次图表
+        self.plot_downsampling = False  # 是否启用降采样
+        self.plot_max_points_visible = 500  # 最大可见点数
+        self.data_batch = []  # 数据批处理缓冲区
 
     def _setup_ui(self):
         central = QtWidgets.QWidget()
@@ -231,11 +237,40 @@ class MainWindow(QtWidgets.QMainWindow):
         self.torque_plot_time = []
         self.torque_plot_ptr = 0
         self.torque_plot_max_points = 2000
-        # self.torque_plot_curve = None  # 不要重置UI对象
-        # self.torque_plot_widget = None
-        # self.torque_status_label = None
         self.torque_recording = False
         self.torque_csv_field = False
+        
+        # 根据通信频率调整绘图参数
+        self.adjust_plot_params()
+        
+    def adjust_plot_params(self):
+        """根据通信频率调整绘图参数"""
+        freq = self.freq_spin.value() if hasattr(self, 'freq_spin') else 20
+        torque_freq = self.torque_freq_spin.value() if hasattr(self, 'torque_freq_spin') else 1000
+        
+        # 根据频率调整绘图更新间隔
+        max_freq = max(freq, torque_freq)
+        if max_freq <= 50:
+            self.plot_update_interval = 30  # 30ms，约33Hz
+            self.plot_downsampling = False
+            self.plot_max_points_visible = 500
+        elif max_freq <= 200:
+            self.plot_update_interval = 50  # 50ms，约20Hz
+            self.plot_downsampling = True
+            self.plot_max_points_visible = 300
+        elif max_freq <= 500:
+            self.plot_update_interval = 100  # 100ms，约10Hz
+            self.plot_downsampling = True
+            self.plot_max_points_visible = 200
+        else:
+            self.plot_update_interval = 200  # 200ms，约5Hz
+            self.plot_downsampling = True
+            self.plot_max_points_visible = 100
+            
+        # 更新定时器间隔
+        if hasattr(self, 'timer'):
+            self.timer.setInterval(self.plot_update_interval)
+            print(f"调整绘图更新间隔为 {self.plot_update_interval}ms，降采样：{self.plot_downsampling}，最大可见点数：{self.plot_max_points_visible}")
 
     def refresh_ports(self):
         self.port_combo.clear()
@@ -302,6 +337,9 @@ class MainWindow(QtWidgets.QMainWindow):
             current = self.current_spin.value()
             device_id = self.id_spin.value()
             self.serial_thread.update_params(send_interval, mode, current, device_id)
+            
+            # 更新绘图参数
+            self.adjust_plot_params()
 
     def connect_torque(self):
         port = self.torque_port_combo.currentText()
@@ -421,13 +459,18 @@ class MainWindow(QtWidgets.QMainWindow):
                     if closest_idx >= 0:
                         record_row['torque'] = self.torque_plot_data[closest_idx]
                 self.record_data.append(record_row)
-            self.fbk_labels['CRC (recv)'].setText(f"0x{data['crc_recv']:04X}")
-            self.fbk_labels['CRC (calc)'].setText(f"0x{data['crc_calc']:04X}")
-            self.fbk_labels['Current (A)'].setText(f"{data['current']:.3f}")
-            self.fbk_labels['Mode'].setText(self.MODES.get(data['mode'], str(data['mode'])))
-            self.fbk_labels['Encoder Angle (rad)'].setText(f"{data['encoder']:.6f}")
-            self.fbk_labels['Encoder Velocity (rad/s)'].setText(f"{data['velocity']:.6f}")
-            self.fbk_labels['Collision'].setText('Yes' if data['collision'] else 'No')
+            
+            # 更新UI标签，但不是每次都更新
+            if not hasattr(self, 'last_label_update_time') or time.perf_counter() - self.last_label_update_time > 0.1:
+                self.fbk_labels['CRC (recv)'].setText(f"0x{data['crc_recv']:04X}")
+                self.fbk_labels['CRC (calc)'].setText(f"0x{data['crc_calc']:04X}")
+                self.fbk_labels['Current (A)'].setText(f"{data['current']:.3f}")
+                self.fbk_labels['Mode'].setText(self.MODES.get(data['mode'], str(data['mode'])))
+                self.fbk_labels['Encoder Angle (rad)'].setText(f"{data['encoder']:.6f}")
+                self.fbk_labels['Encoder Velocity (rad/s)'].setText(f"{data['velocity']:.6f}")
+                self.fbk_labels['Collision'].setText('Yes' if data['collision'] else 'No')
+                self.last_label_update_time = time.perf_counter()
+                
             # Store data for plotting
             t = msg_time
             idx = self.data_ptr % self.max_points
@@ -483,24 +526,43 @@ class MainWindow(QtWidgets.QMainWindow):
                 angle_arr = self.data_angle[:self.data_count]
                 vel_arr = self.data_velocity[:self.data_count]
                 cur_arr = self.data_current[:self.data_count]
-                t_now = t_arr[-1]
+                t_now = t_arr[-1] if len(t_arr) > 0 else 0
             else:
                 idx = self.data_ptr % self.max_points
                 t_arr = np.concatenate((self.data_time[idx:], self.data_time[:idx]))
                 angle_arr = np.concatenate((self.data_angle[idx:], self.data_angle[:idx]))
                 vel_arr = np.concatenate((self.data_velocity[idx:], self.data_velocity[:idx]))
                 cur_arr = np.concatenate((self.data_current[idx:], self.data_current[:idx]))
-                t_now = t_arr[-1]
+                t_now = t_arr[-1] if len(t_arr) > 0 else 0
+                
             # Use plot_time_zero for x axis
             if self.plot_time_zero is not None:
                 t_plot = t_arr - self.plot_time_zero
             else:
                 t_plot = t_arr
+                
+            # 只显示时间窗口内的数据
             mask = (t_arr > t_now - self.plot_window)
             if np.any(mask):
-                self.plot_curves[0].setData(t_plot[mask], angle_arr[mask])
-                self.plot_curves[1].setData(t_plot[mask], vel_arr[mask])
-                self.plot_curves[2].setData(t_plot[mask], cur_arr[mask])
+                # 应用掩码获取可见数据
+                visible_t = t_plot[mask]
+                visible_angle = angle_arr[mask]
+                visible_vel = vel_arr[mask]
+                visible_cur = cur_arr[mask]
+                
+                # 如果启用降采样且数据点过多，则进行降采样
+                if self.plot_downsampling and len(visible_t) > self.plot_max_points_visible:
+                    step = max(1, len(visible_t) // self.plot_max_points_visible)
+                    visible_t = visible_t[::step]
+                    visible_angle = visible_angle[::step]
+                    visible_vel = visible_vel[::step]
+                    visible_cur = visible_cur[::step]
+                
+                # 更新图表
+                self.plot_curves[0].setData(visible_t, visible_angle)
+                self.plot_curves[1].setData(visible_t, visible_vel)
+                self.plot_curves[2].setData(visible_t, visible_cur)
+                
                 for pw in self.plot_widgets:
                     pw.setLabel('bottom', 'Time (s)')
             else:
@@ -513,14 +575,27 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # ---------- 扭矩传感器绘图 ----------
         if self.torque_plot_curve is not None and self.torque_plot_data:
-            t0 = self.torque_plot_time[0]
-            t_plot = [t - t0 for t in self.torque_plot_time]
-            window = self.plot_window_spin.value()
-            t_now = t_plot[-1]
-            mask = [tt > t_now - window for tt in t_plot]
-            x = [tt for tt, m in zip(t_plot, mask) if m]
-            y = [yy for yy, m in zip(self.torque_plot_data, mask) if m]
-            self.torque_plot_curve.setData(x, y)
+            if len(self.torque_plot_time) > 0:
+                t0 = self.torque_plot_time[0]
+                t_plot = [t - t0 for t in self.torque_plot_time]
+                window = self.plot_window_spin.value()
+                t_now = t_plot[-1] if t_plot else 0
+                
+                # 只显示时间窗口内的数据
+                visible_data = [(t, y) for t, y in zip(t_plot, self.torque_plot_data) if t > t_now - window]
+                
+                # 如果启用降采样且数据点过多，则进行降采样
+                if self.plot_downsampling and len(visible_data) > self.plot_max_points_visible:
+                    step = max(1, len(visible_data) // self.plot_max_points_visible)
+                    visible_data = visible_data[::step]
+                
+                if visible_data:
+                    x, y = zip(*visible_data)
+                    self.torque_plot_curve.setData(x, y)
+                else:
+                    self.torque_plot_curve.setData([], [])
+            else:
+                self.torque_plot_curve.setData([], [])
         else:
             if self.torque_plot_curve is not None:
                 self.torque_plot_curve.setData([], [])
