@@ -283,13 +283,13 @@ class MainWindow(QtWidgets.QMainWindow):
         baud = int(self.torque_baud_combo.currentText())
         freq = self.torque_freq_spin.value()
         self.torque_thread.configure(port, baud, freq)
-        # 只连接，不启动线程
         self.torque_connect_btn.setEnabled(False)
         self.torque_disconnect_btn.setEnabled(True)
         self.torque_start_btn.setEnabled(True)
         self.torque_stop_btn.setEnabled(False)
         self.torque_connected = True
-        self.torque_status_label.setText('Connected')
+        if self.torque_status_label is not None:
+            self.torque_status_label.setText('Connected')
 
     def disconnect_serial(self):
         self.serial_thread.stop()
@@ -305,7 +305,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.torque_start_btn.setEnabled(False)
         self.torque_stop_btn.setEnabled(False)
         self.torque_connected = False
-        self.torque_status_label.setText('Not connected')
+        if self.torque_status_label is not None:
+            self.torque_status_label.setText('Not connected')
 
     def on_status_changed(self, ok):
         self.connected = ok
@@ -322,7 +323,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.torque_stop_btn.setEnabled(False)
             self.torque_start_btn.setEnabled(True)
         self.torque_connected = ok
-        self.torque_status_label.setText('Connected' if ok else 'Not connected')
+        if self.torque_status_label is not None:
+            self.torque_status_label.setText('Connected' if ok else 'Not connected')
         if not ok:
             if self.torque_plot_curve is not None:
                 self.torque_plot_curve.setData([], [])
@@ -387,11 +389,22 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         if not self.torque_connected:
             return
+        print(f'Received torque: {torque}')  # 调试输出
         if len(self.torque_plot_data) >= self.torque_plot_max_points:
             self.torque_plot_data = self.torque_plot_data[1:]
             self.torque_plot_time = self.torque_plot_time[1:]
         self.torque_plot_data.append(torque)
         self.torque_plot_time.append(timestamp)
+        # 立即刷新图像（可选，提升响应）
+        if self.torque_plot_curve is not None:
+            t0 = self.torque_plot_time[0]
+            t_plot = [t - t0 for t in self.torque_plot_time]
+            window = self.plot_window_spin.value()
+            t_now = t_plot[-1]
+            mask = [tt > t_now - window for tt in t_plot]
+            x = [tt for tt, m in zip(t_plot, mask) if m]
+            y = [yy for yy, m in zip(self.torque_plot_data, mask) if m]
+            self.torque_plot_curve.setData(x, y)
 
     def update_plots(self):
         self.plot_window = self.plot_window_spin.value()
