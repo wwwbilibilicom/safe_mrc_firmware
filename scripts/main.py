@@ -152,6 +152,15 @@ class MainWindow(QtWidgets.QMainWindow):
         torque_row.addWidget(self.torque_disconnect_btn)
         self.torque_status_label = QtWidgets.QLabel('Not connected')
         torque_row.addWidget(self.torque_status_label)
+        # 新增采集控制按钮
+        self.torque_start_btn = QtWidgets.QPushButton('Start Sampling')
+        self.torque_stop_btn = QtWidgets.QPushButton('Stop Sampling')
+        self.torque_start_btn.setEnabled(False)
+        self.torque_stop_btn.setEnabled(False)
+        self.torque_start_btn.clicked.connect(self.start_torque_sampling)
+        self.torque_stop_btn.clicked.connect(self.stop_torque_sampling)
+        torque_row.addWidget(self.torque_start_btn)
+        torque_row.addWidget(self.torque_stop_btn)
         torque_row.addStretch()
         layout.addLayout(torque_row)
         # Plot controls
@@ -274,9 +283,13 @@ class MainWindow(QtWidgets.QMainWindow):
         baud = int(self.torque_baud_combo.currentText())
         freq = self.torque_freq_spin.value()
         self.torque_thread.configure(port, baud, freq)
-        self.torque_thread.start()
+        # 只连接，不启动线程
         self.torque_connect_btn.setEnabled(False)
         self.torque_disconnect_btn.setEnabled(True)
+        self.torque_start_btn.setEnabled(True)
+        self.torque_stop_btn.setEnabled(False)
+        self.torque_connected = True
+        self.torque_status_label.setText('Connected')
 
     def disconnect_serial(self):
         self.serial_thread.stop()
@@ -286,9 +299,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.start_btn.setChecked(False)
 
     def disconnect_torque(self):
-        self.torque_thread.stop()
+        self.stop_torque_sampling()
         self.torque_connect_btn.setEnabled(True)
         self.torque_disconnect_btn.setEnabled(False)
+        self.torque_start_btn.setEnabled(False)
+        self.torque_stop_btn.setEnabled(False)
+        self.torque_connected = False
+        self.torque_status_label.setText('Not connected')
 
     def on_status_changed(self, ok):
         self.connected = ok
@@ -300,10 +317,15 @@ class MainWindow(QtWidgets.QMainWindow):
     def on_torque_status(self, ok):
         if self.torque_status_label is None:
             return
+        # 采集线程结束时自动切换按钮状态
+        if not ok:
+            self.torque_stop_btn.setEnabled(False)
+            self.torque_start_btn.setEnabled(True)
         self.torque_connected = ok
         self.torque_status_label.setText('Connected' if ok else 'Not connected')
         if not ok:
-            self.torque_plot_curve.setData([], [])
+            if self.torque_plot_curve is not None:
+                self.torque_plot_curve.setData([], [])
             self.torque_plot_data = []
             self.torque_plot_time = []
 
@@ -360,9 +382,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self.last_data_time = t
 
     def on_torque_data(self, timestamp, torque):
+        # 只有采集线程在运行时才更新数据
+        if not self.torque_thread.isRunning():
+            return
         if not self.torque_connected:
             return
-        # 只在连接时更新buffer和绘图
         if len(self.torque_plot_data) >= self.torque_plot_max_points:
             self.torque_plot_data = self.torque_plot_data[1:]
             self.torque_plot_time = self.torque_plot_time[1:]
@@ -517,6 +541,21 @@ class MainWindow(QtWidgets.QMainWindow):
         self.torque_plot_data = []
         self.torque_plot_time = []
         self.torque_plot_curve.setData([], [])
+
+    def start_torque_sampling(self):
+        if not self.torque_connected:
+            return
+        if not self.torque_thread.isRunning():
+            self.torque_thread._stop_event = False
+            self.torque_thread.start()
+        self.torque_start_btn.setEnabled(False)
+        self.torque_stop_btn.setEnabled(True)
+
+    def stop_torque_sampling(self):
+        if self.torque_thread.isRunning():
+            self.torque_thread.stop()
+        self.torque_start_btn.setEnabled(True)
+        self.torque_stop_btn.setEnabled(False)
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
