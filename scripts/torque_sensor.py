@@ -52,7 +52,7 @@ class TorqueSensor:
                     if buffer[i] == 0x01 and buffer[i + 1] == 0x03:
                         U_DATA = buffer[i + 6]
                         U_DATA |= buffer[i + 5] << 8
-                        return self.hex2dec(U_DATA) / 30.0
+                        return self.hex2dec(U_DATA) / 100.0
                 print("Valid frame header not found in response")
         except serial.SerialException as e:
             print(f"Error reading torque sensor: {e}")
