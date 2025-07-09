@@ -44,7 +44,7 @@ def crc_ccitt(data, crc=0xFFFF):
         crc = ((crc >> 8) ^ CRC_CCITT_TABLE[(crc ^ b) & 0xFF]) & 0xFFFF
     return crc
 
-class SafeMRCThread(QtCore.QThread):
+class SerialThread(QtCore.QThread):
     data_received = QtCore.pyqtSignal(dict)
     status_changed = QtCore.pyqtSignal(bool)
     error_signal = QtCore.pyqtSignal(str)
@@ -53,20 +53,14 @@ class SafeMRCThread(QtCore.QThread):
         super().__init__()
         self.ser = None
         self.running = False
-        self.send_interval = 0.05
+        self.send_interval = 0.05  # default 20Hz
         self.mode = 0
         self.current = 0.0
         self.device_id = 1
-        self.port = None
-        self.baudrate = None
         self.lock = threading.Lock()
         self._stop_event = threading.Event()
         self._sending = False
         self._last_cmd = b''
-
-    @staticmethod
-    def get_available_ports():
-        return [p.device for p in serial.tools.list_ports.comports()]
 
     def configure(self, port, baudrate, send_interval, mode, current, device_id):
         self.port = port
@@ -93,13 +87,16 @@ class SafeMRCThread(QtCore.QThread):
         buffer = b''
         while not self._stop_event.is_set():
             now = time.time()
+            # Only send command if enabled
             if self._sending and (now - last_send >= self.send_interval):
                 with self.lock:
                     cmd = self.pack_cmd(self.mode, self.current)
                     self._last_cmd = cmd
                 self.ser.write(cmd)
                 last_send = now
-                self.data_received.emit({'raw_frame': cmd, 'direction': 'TX', 'timestamp': time.perf_counter()})
+                # Emit TX hex log
+                self.data_received.emit({'raw_frame': cmd, 'direction': 'TX'})
+            # Read feedback
             try:
                 if self.ser.in_waiting:
                     buffer += self.ser.read(self.ser.in_waiting)
@@ -116,7 +113,7 @@ class SafeMRCThread(QtCore.QThread):
                         if data:
                             data['raw_frame'] = frame
                             data['direction'] = 'RX'
-                            data['timestamp'] = time.perf_counter()
+                            data['timestamp'] = time.perf_counter()  # 高精度时间戳
                             self.data_received.emit(data)
             except Exception:
                 pass
@@ -138,17 +135,19 @@ class SafeMRCThread(QtCore.QThread):
             self.device_id = device_id
 
     def pack_cmd(self, mode, current):
+        # Command protocol: 0xFE 0xEE id(1) mode(1) current(int32, 4 bytes) CRC(2)
         head = b'\xFE\xEE'
         id_byte = self.device_id.to_bytes(1, 'little')
         mode_byte = mode.to_bytes(1, 'little')
         cur = int(current * 1000)
-        cur_bytes = cur.to_bytes(4, 'little', signed=True)
+        cur_bytes = cur.to_bytes(4, 'little', signed=True)  # int32_t, little-endian
         payload = head + id_byte + mode_byte + cur_bytes
         crc = crc_ccitt(payload)
-        crc_bytes = crc.to_bytes(2, 'little')
+        crc_bytes = crc.to_bytes(2, 'little')  # little-endian for CRC, to match embedded
         return payload + crc_bytes
 
     def parse_feedback(self, frame):
+        # Feedback: 0xFE 0xEE id(1) mode(1) collision(1) encoder(4) velocity(4) current(2) CRC(2)
         try:
             if frame[0] != 0xFE or frame[1] != 0xEE:
                 return None
@@ -176,3 +175,7 @@ class SafeMRCThread(QtCore.QThread):
     def enable_sending(self, enable):
         with self.lock:
             self._sending = enable 
+
+    @staticmethod
+    def get_available_ports():
+        return [p.device for p in serial.tools.list_ports.comports()] 
