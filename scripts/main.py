@@ -287,32 +287,29 @@ class MainWindow(QtWidgets.QMainWindow):
             self.data_angle[idx] = data['encoder']
             self.data_velocity[idx] = data['velocity']
             self.data_current[idx] = data['current']
+            self.data_torque[idx] = self.torque_value if self.torque_connected else 0.0
             self.data_ptr += 1
             self.data_count = min(self.data_count + 1, self.max_points)
             self.last_data_time = t
 
     def update_all(self):
         t_now = time.perf_counter()
-        idx = self.data_ptr % self.max_points
-        # SafeMRC数据由on_data_received推进data_ptr
-        # 扭矩传感器采样
+        # idx = self.data_ptr % self.max_points  # 不再在这里写入self.data_torque
         torque_sampled = False
         torque = self.torque_value  # 默认保持上一个值
         if self.torque_connected:
             try:
                 t_val = self.torque_sensor.read_torque()
-                # 只有采集到有效数据才更新
                 if t_val is not None and isinstance(t_val, (int, float)):
                     torque = t_val
                     self.torque_value = torque
-                    self.data_torque[idx] = torque
                     self.torque_val_label.setText(f'Torque: {torque:.4f} Nm')
                     torque_sampled = True
             except Exception:
                 pass
         else:
             self.torque_val_label.setText('Torque: -- Nm')
-        # 只有采样到新扭矩数据时才刷新plot
+        # 只有采样到新扭矩数据时才刷新plot（但不再写入self.data_torque）
         if torque_sampled:
             self.update_plots()
         # 如果SafeMRC数据推进了data_ptr但扭矩未采样到新值，保持上一个扭矩值
