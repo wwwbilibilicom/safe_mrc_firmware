@@ -262,6 +262,23 @@ class MainWindow(QtWidgets.QMainWindow):
         current = self.current_spin.value()
         device_id = self.id_spin.value()
         print(f"SafeMRC: 连接到端口 {port}，波特率 {baudrate}，发送频率 {freq}Hz")
+        
+        # 先测试串口是否可用
+        try:
+            import serial
+            test_ser = serial.Serial(port, baudrate, timeout=0.5, write_timeout=0.5)
+            print(f"SafeMRC: 测试串口连接成功: {test_ser}")
+            test_data = b'\xFE\xEE\x01\x00\x00\x00\x00\x00\x00\x00'  # 简单的测试数据
+            bytes_written = test_ser.write(test_data)
+            print(f"SafeMRC: 测试发送成功，已发送 {bytes_written} 字节")
+            test_ser.close()
+        except Exception as e:
+            import traceback
+            print(f"SafeMRC: 测试串口失败: {e}")
+            traceback.print_exc()
+            QtWidgets.QMessageBox.critical(self, 'Serial Test Error', f'Failed to test serial port:\n{e}')
+            return
+            
         self.serial_thread.configure(port, baudrate, send_interval, mode, current, device_id)
         try:
             self.serial_thread.start()
@@ -291,6 +308,23 @@ class MainWindow(QtWidgets.QMainWindow):
         baud = int(self.torque_baud_combo.currentText())
         freq = self.torque_freq_spin.value()
         print(f"扭矩传感器: 连接到端口 {port}，波特率 {baud}，采样频率 {freq}Hz")
+        
+        # 先测试串口是否可用
+        try:
+            import serial
+            test_ser = serial.Serial(port, baud, timeout=0.5, write_timeout=0.5)
+            print(f"扭矩传感器: 测试串口连接成功: {test_ser}")
+            test_data = bytes([0x01, 0x03, 0x00, 0x1E, 0x00, 0x02, 0xA4, 0x0D])  # 简单的测试数据
+            bytes_written = test_ser.write(test_data)
+            print(f"扭矩传感器: 测试发送成功，已发送 {bytes_written} 字节")
+            test_ser.close()
+        except Exception as e:
+            import traceback
+            print(f"扭矩传感器: 测试串口失败: {e}")
+            traceback.print_exc()
+            QtWidgets.QMessageBox.critical(self, 'Torque Sensor Test Error', f'Failed to test serial port:\n{e}')
+            return
+            
         self.torque_thread.configure(port, baud, freq)
         try:
             self.torque_thread.start()

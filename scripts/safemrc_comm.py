@@ -76,18 +76,43 @@ class SerialThread(QtCore.QThread):
 
     def run(self):
         try:
-            self.ser = serial.Serial(self.port, self.baudrate, timeout=0.1)
+            print(f"SafeMRC: 尝试打开串口 {self.port}，波特率 {self.baudrate}")
+            # 添加更多串口配置参数
+            self.ser = serial.Serial(
+                port=self.port,
+                baudrate=self.baudrate,
+                bytesize=serial.EIGHTBITS,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                timeout=0.1,
+                write_timeout=0.5
+            )
+            print(f"SafeMRC: 串口打开成功，配置: {self.ser}")
+            
             self.running = True
             self.rx_buffer = b''
             self.status_changed.emit(True)
             
+            # 创建发送定时器
+            self.send_timer = QtCore.QTimer()
+            print("SafeMRC: 创建定时器")
+            
+            # 确保定时器在当前线程中运行
+            self.send_timer.moveToThread(self)
+            print("SafeMRC: 移动定时器到当前线程")
+            
+            # 连接定时器信号到发送命令方法
+            self.send_timer.timeout.connect(self.send_command)
+            print("SafeMRC: 连接定时器信号到send_command方法")
+            
             # 启动发送定时器，使用毫秒
             interval_ms = int(self.send_interval * 1000)
-            self.send_timer = QtCore.QTimer()
-            self.send_timer.moveToThread(self)
-            self.send_timer.timeout.connect(self.send_command)
             self.send_timer.start(interval_ms)
             print(f"SafeMRC: 发送定时器已启动，间隔 {interval_ms} ms")
+            
+            # 手动触发一次发送，测试是否正常
+            QtCore.QTimer.singleShot(100, self.send_command)
+            print("SafeMRC: 手动触发一次发送")
             
             # 接收循环
             while not self._stop_event:
@@ -114,8 +139,8 @@ class SerialThread(QtCore.QThread):
 
     def send_command(self):
         """定时器触发的发送命令函数"""
+        print(f"SafeMRC send_command被调用: _sending={self._sending}, running={self.running}")
         if not self._sending or not self.running:
-            print(f"SafeMRC send_command: _sending={self._sending}, running={self.running}")
             return
         try:
             with QtCore.QMutexLocker(self.lock):
@@ -124,13 +149,15 @@ class SerialThread(QtCore.QThread):
             
             if self.ser and self.ser.is_open:
                 print(f"SafeMRC sending command: {' '.join(f'{b:02X}' for b in cmd)}")
-                self.ser.write(cmd)
+                bytes_written = self.ser.write(cmd)
+                print(f"SafeMRC 已发送 {bytes_written} 字节")
                 # 发送信号通知UI
                 self.data_received.emit({'raw_frame': cmd, 'direction': 'TX'})
             else:
                 print(f"SafeMRC serial not open: ser={self.ser}, is_open={self.ser.is_open if self.ser else False}")
         except Exception as e:
             import traceback
+            print(f"SafeMRC send_command异常: {e}")
             traceback.print_exc()
             # 发送错误不中断线程，只记录
 
@@ -223,8 +250,15 @@ class SerialThread(QtCore.QThread):
             return None
 
     def enable_sending(self, enable):
+        print(f"SafeMRC: {'启用' if enable else '禁用'}发送，当前状态: _sending={self._sending}, running={self.running}")
         with QtCore.QMutexLocker(self.lock):
             self._sending = enable
+        
+        # 如果启用发送，立即触发一次发送
+        if enable and self.running:
+            print("SafeMRC: 立即触发一次发送")
+            # 使用singleShot确保在GUI线程中执行
+            QtCore.QTimer.singleShot(10, self.send_command)
     
     @staticmethod
     def get_available_ports():
