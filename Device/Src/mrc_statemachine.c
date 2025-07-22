@@ -1,3 +1,11 @@
+/**************************************************
+ * Copyright (c) 2025 Wenbo Li
+ * University of Science and Technology of China
+ *
+ * This file is part of the SafeMRC project.
+ * Distributed under the MIT License.
+ **************************************************/
+
 #include "mrc_statemachine.h"
 
 // User should implement this function to actually set the hardware current

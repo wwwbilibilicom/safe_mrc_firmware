@@ -1,14 +1,14 @@
-# Safe MRC - STM32H7 Magnetorheological Clutch Controller
+# SafeMRC - STM32H7 Magnetorheological Clutch Controller
 
 ## Overview
 
-Safe MRC is an embedded control system for Magnetorheological Clutch (MRC) devices using STM32H7 microcontrollers. The system provides precise torque, current, and voltage control, collision detection, and real-time communication capabilities.
+SafeMRC is an embedded control system for Magnetorheological Clutch (MRC) devices based on STM32H7 microcontrollers. The system provides precise torque, current, and voltage control, real-time collision detection, and robust communication capabilities.
 
 ## Features
 
 - **Precise Torque/Current/Voltage Control**: Supports both voltage and current (feedforward+PI) control modes, with easy switching.
 - **Collision Detection**: Real-time collision detection and safety response.
-- **DMA Communication**: High-efficiency UART communication using DMA.
+- **DMA UART Communication**: High-efficiency UART communication using DMA and IDLE interrupt.
 - **Request-Response Protocol**: Master-slave communication pattern to avoid bus conflicts.
 - **Multi-sensor Support**: Encoder feedback, voltage monitoring, and temperature sensing.
 - **Safety Features**: Automatic demagnetization on collision detection.
@@ -20,13 +20,19 @@ Safe MRC is an embedded control system for Magnetorheological Clutch (MRC) devic
 
 ```
 safe-MRC/
-├── Common/           # Common utilities (filters, PID controllers)
-├── Core/            # STM32H7 core files and main application
-├── Device/          # Device drivers and communication modules
-│   ├── Inc/         # Header files
-│   └── Src/         # Source files
-├── Drivers/         # STM32H7 HAL drivers
-└── MDK-ARM/         # Keil MDK-ARM project files
+├── Common/           # Common utilities: filters, PID controllers, etc.
+│   ├── Inc/          # Common header files
+│   └── Src/          # Common source files
+├── Core/             # STM32H7 core files, startup, main, and peripherals
+│   ├── Inc/          # Core header files
+│   └── Src/          # Core source files (main.c, interrupts, etc.)
+├── Device/           # Device drivers and application modules
+│   ├── Inc/          # Device/application header files
+│   └── Src/          # Device/application source files
+├── Drivers/          # STM32H7 HAL drivers (official)
+├── MDK-ARM/          # Keil MDK-ARM project files
+├── scripts/          # Python host UI, SDK, and data analysis tools
+└── ...
 ```
 
 ## 1. Control Modes & Key Logic
@@ -51,7 +57,7 @@ safe-MRC/
 
 ## 2. Coil Current Control (Feedforward + PI)
 
-- **Function**: `float MRC_CoilCurrentControl_Update(Device_MRC_t *MRC, float i_ref, float i_meas, float R_coil, float L_coil, float Ts);`
+- **Function**: `float MRC_CoilCurrentControl_Update(Device_MRC_t *MRC);`
 - **Parameters**:
   - `i_ref`: Target current (A)
   - `i_meas`: Measured current (A)
@@ -83,15 +89,6 @@ safe-MRC/
 | 0                  | 0.0017               | 0                | -0.062             |
 | 0.1                | 0.0017               | 0.00833          | -0.062             |
 | 0.2                | 0.0017               | 0.01667          | 0.062              |
-| 0.3                | 0.00295              | 0.025            | 0.062              |
-| 0.4                | 0.00735              | 0.03333          | 0.062              |
-| 0.5                | 0.0142               | 0.04167          | 0.067              |
-| 0.6                | 0.0434               | 0.05             | 0.073              |
-| 0.7                | 0.1336               | 0.05833          | 0.103              |
-| 0.8                | 0.2831               | 0.06667          | 0.147              |
-| 0.9                | 0.50175              | 0.075            | 0.201              |
-| 1                  | 0.66635              | 0.08333          | 0.242              |
-| 1.1                | 0.828                | 0.09167          | 0.289              |
 | ...                | ...                  | ...              | ...                |
 | 5.0                | 5.752                | 0.41667          | 1.200              |
 
@@ -103,12 +100,18 @@ safe-MRC/
 
 | Member                  | Type/Macro             | Description                        |
 |------------------------|------------------------|-------------------------------------|
-| `mode`                 | `MRC_Mode`             | Work mode                           |
 | `state_phase`          | `MRC_State`            | State machine phase                 |
-| `VNH7040`              | `Device_VNH7040_t`     | H-bridge driver structure           |
+| `collision_threshold`  | `float`                | Collision detection threshold       |
+| `COLLISION_REACT_FLAG` | `uint8_t`              | Collision reaction flag             |
+| `com`                  | `MRC_Com_t`            | Communication structure             |
+| `LED1`, `LED2`         | `device_led_t`         | LEDs for feedback                   |
+| `KEY1`, `KEY2`         | `device_key_t`         | Keys for user input                 |
+| `Encoder`              | `Device_encoder_t`     | Encoder feedback                    |
+| `VNH7040`              | `Device_VNH7040_t`     | H-bridge driver                     |
 | `coil_pid`             | `PID_Controller`       | Coil current PI controller          |
 | `coil_current_filter`  | `SimpleLowPassFilter`  | Coil current low-pass filter        |
 | `control_mode`         | `MRC_ControlMode`      | Control mode (voltage/current)      |
+| `statemachine`         | `MRC_StateMachine_t`   | State machine for safety/mode mgmt  |
 | ...                    | ...                    | ...                                 |
 
 **All members and functions are documented in the header files with clear comments.**
@@ -131,15 +134,15 @@ safe-MRC/
 - **Error Checking**: CRC-16-CCITT (poly=0x1021, init=0xFFFF, no xorout, no reflection)
 - **Bus Arbitration**: Only one device transmits at a time (slave only responds after receiving a command)
 
-#### Command Message (Host → Device, 8 bytes)
+#### Command Message (Host → Device, 10 bytes)
 
-| Byte Index | Field Name    | Size (bytes) | Description                          |
-| ---------- | ------------- | ------------ | ------------------------------------ |
-| 0-1        | Header        | 2            | Frame header, fixed 0xFE, 0xEE       |
-| 2          | Device ID     | 1            | Target device address (0-255)        |
-| 3          | Mode          | 1            | Work mode (see below)                |
-| 4-5        | Target Torque | 2            | Target torque, uint16, little-endian |
-| 6-7        | CRC-16-CCITT  | 2            | CRC of bytes 0-5, little-endian      |
+| Byte Index | Field Name        | Size (bytes) | Description                          |
+| ---------- | ---------------- | ------------ | ------------------------------------ |
+| 0-1        | Header           | 2            | Frame header, fixed 0xFE, 0xEE       |
+| 2          | Device ID        | 1            | Target device address (0-255)        |
+| 3          | Mode             | 1            | Work mode (see below)                |
+| 4-7        | Target Current   | 4            | Desired coil current, int32, little-endian (mA) |
+| 8-9        | CRC-16-CCITT     | 2            | CRC of bytes 0-7, little-endian      |
 
 #### Feedback Message (Device → Host, 17 bytes)
 
@@ -151,25 +154,10 @@ safe-MRC/
 | 4          | Collision Flag   | 1            | 0: safe, 1: collision detected              |
 | 5-8        | Encoder Value    | 4            | Encoder reading, int32, little-endian (deg*1000) |
 | 9-12       | Encoder Velocity | 4            | Encoder angular velocity, int32, little-endian (deg/s*1000) |
-| 13-14      | Present Current  | 2            | Current torque, int16, little-endian        |
+| 13-14      | Present Current  | 2            | Current torque, int16, little-endian (mA)   |
 | 15-16      | CRC-16-CCITT     | 2            | CRC of bytes 0-14, little-endian            |
 
-**Note:** 反馈报文长度由13字节升级为17字节，增加了编码器速度字段，编码器角度和速度均为int32，单位分别为"度*1000"和"度/秒*1000"。
-
-#### SPI Encoder Angle Reading
-
-- **Supported Encoder:** KTH78xx series (or compatible SPI angle encoders)
-- **SPI Read Function:**
-  - `float KTH78_ReadAngle(void);`  // 直接读取角度，单位：度
-  - `void Encoder_SPI_ReadAngle_WithWait(Device_encoder_t *Encoder_dev);` // 读取并更新结构体
-  - `void Encoder_SPI_ExchangeData(Device_encoder_t *Encoder_dev);` // 交换数据（无等待）
-- **原理说明：**
-  - 通过SPI发送`KTH78_READ_ANGLE`命令，读取2字节原始数据，转换为0~360度的角度值。
-  - 支持阻塞和非阻塞两种读取方式。
-  - 读取到的角度会自动经过滤波和连续角度处理，最终用于反馈报文。
-- **结构体说明：**
-  - `Device_encoder_t`结构体包含SPI数据缓存、原始角度、连续角度、滤波角度、速度等信息。
-  - 相关成员：`raw_angle`（原始角度），`filtered_angle`（滤波后角度），`AngularVelocity`（角速度，rad/s），`spi_databack[2]`（SPI原始数据）。
+**Note:** All multi-byte fields use little-endian byte order. CRC is calculated over all bytes except the CRC field itself.
 
 #### CRC-16-CCITT Calculation
 
@@ -177,7 +165,7 @@ safe-MRC/
 - **Initial Value**: 0xFFFF
 - **Input/Output Reflection**: None
 - **Final XOR**: None
-- **Range**: For command, CRC covers bytes 0-5; for feedback, CRC covers bytes 0-14
+- **Range**: For command, CRC covers bytes 0-7; for feedback, CRC covers bytes 0-14
 
 **Example (C code):**
 
@@ -192,10 +180,11 @@ uint16_t crc_ccitt(uint16_t crc, const uint8_t *data, size_t len);
 | 0     | FREE       | Free mode (no output) |
 | 1     | FIX_LIMIT  | Fixed limit mode      |
 | 2     | ADAPTATION | Adaptation mode       |
+| 3     | DEBUG      | Debug mode            |
 
 #### Example Communication Sequence
 
-1. The host sends an 8-byte command frame to the RS-485 bus.
+1. The host sends a 10-byte command frame to the RS-485 bus.
 2. The target device verifies the ID and CRC, then parses the command.
 3. The device replies with a 17-byte feedback frame containing its current status.
 4. The host verifies the feedback CRC and reads the status.
@@ -229,20 +218,20 @@ while(1) {
     MRC_Key2_Reaction(&mrc_device); // Handle key2
     if (mrc_device.control_mode == MRC_CURRENT_CONTROL) {
         float i_meas = MRC_Update_Coil_Current(&mrc_device);
-        float v_cmd = MRC_CoilCurrentControl_Update(&mrc_device, mrc_device.des_coil_current, i_meas, 4.22f, 0.0014868f, 0.001f);
+        float v_cmd = MRC_CoilCurrentControl_Update(&mrc_device);
         // v_cmd is sent to PWM driver automatically
     } else {
-    MRC_set_voltage(&mrc_device);
-}
+        MRC_set_voltage(&mrc_device);
+    }
 }
 ```
 
 ## Reflection & Suggestions
 
-- **Documentation Sync**: Always update README after code changes, especially for LUT, parameters, interfaces, and communication protocol (如反馈报文结构变更、SPI读取方式变更等)。
+- **Documentation Sync**: Always update README after code changes, especially for LUT, parameters, interfaces, and communication protocol (e.g., feedback structure changes, SPI read method changes, etc.).
 - **Configurable Parameters**: Consider making PI parameters and LUT updatable via communication protocol in the future.
 - **Comments & Examples**: Keep Doxygen-style comments and provide simple usage examples for beginners.
-- **SPI Encoder Support**: 建议后续支持更多类型的SPI编码器，并在文档中持续完善相关说明和使用示例。
+- **SPI Encoder Support**: Consider supporting more types of SPI encoders in the future and keep documentation up to date.
 
 ---
 
@@ -258,7 +247,7 @@ while(1) {
 
 ### Build Steps
 
-1. Open`MDK-ARM/safeMRC.uvprojx` in Keil MDK-ARM
+1. Open `MDK-ARM/safeMRC.uvprojx` in Keil MDK-ARM
 2. Configure target settings if needed
 3. Build the project (F7)
 4. Flash to STM32H7 device
@@ -289,7 +278,7 @@ Initialize MRC device with communication support.
 
 #### `MRC_set_voltage(mrc)`
 
-Set coil voltage based on target torque.
+Set coil voltage based on target value.
 
 **Parameters:**
 
@@ -303,15 +292,13 @@ Handle communication exchange using request-response pattern.
 
 - `mrc`: MRC device structure pointer
 
-#### `MRC_collision_detect(mrc1, mrc2, param, threshold)`
+#### `MRC_collision_detect(mrc)`
 
-Detect collision between two MRC devices.
+Detect collision for the MRC device.
 
 **Parameters:**
 
-- `mrc1`,`mrc2`: MRC device structure pointers
-- `param`: Detection parameter
-- `threshold`: Collision threshold
+- `mrc`: MRC device structure pointer
 
 ### Communication Functions
 
@@ -323,7 +310,7 @@ Initialize communication module with DMA idle reception support.
 
 Unpack and validate command from DMA buffer (device side).
 
-#### `MRC_Com_PackFbk(mrc_com, mode, encoder, torque, collision)`
+#### `MRC_Com_PackFbk(mrc_com, mode, encoder, velocity, current, collision)`
 
 Pack feedback message with current device status (device side).
 
@@ -331,13 +318,9 @@ Pack feedback message with current device status (device side).
 
 Send feedback response using DMA (device side).
 
-#### `MRC_Com_RestartReception(mrc_com)`
+#### `MRC_Com_Reset(mrc_com)`
 
-Restart DMA reception for next command (device side).
-
-#### `MRC_Com_PackCmd(mrc_com, mode, torque)` (Host side)
-
-Pack command message for transmission.
+Reset communication status and restart DMA reception (device side).
 
 ## Safety Features
 
@@ -353,23 +336,19 @@ Pack command message for transmission.
 ### Common Issues
 
 1. **Communication Not Working**
-
    - Check UART configuration in STM32CubeMX
    - Verify DMA settings for USART2
    - Ensure IDLE interrupt is enabled
    - Confirm request-response timing
 2. **CRC Errors**
-
    - Verify protocol implementation on host side
    - Check byte order and data types
    - Ensure consistent CRC calculation
 3. **DMA Issues**
-
    - Verify DMA stream configuration
    - Check interrupt priorities
    - Ensure proper buffer alignment
 4. **Bus Conflicts**
-
    - Ensure only one device responds at a time
    - Check device ID configuration
    - Verify request-response timing
@@ -381,7 +360,7 @@ The system provides debug output through UART1:
 - Device initialization status
 - Communication errors
 - Collision detection events
-- Voltage changes
+- Voltage/current changes
 
 ## License
 
@@ -399,55 +378,9 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 For technical support or questions, please open an issue on the project repository.
 
-## 8. UART4 String Command Set (Debug/Control)
+## 8. Host UI & Python SDK (PC Tool)
 
-You can send string commands via UART4 (baud rate 921600) to switch control modes and set target values at runtime. **This feature is fully decoupled from the main device driver and is initialized in `main.c`, so it is always active after device startup.**
-
-### Supported Command Formats
-
-- Switch control mode:
-  - `MODE VOLTAGE`   Switch to voltage control mode
-  - `MODE CURRENT`   Switch to current control mode
-- Set target value:
-  - `SET VOLTAGE <value>`   Set target voltage (unit: V, range: -12.0 ~ 12.0)
-  - `SET CURRENT <value>`   Set target current (unit: A, range: -5.0 ~ 5.0)
-
-### Usage Examples
-
-- Switch to current mode:
-  ```
-  MODE CURRENT
-  ```
-- Set target current to 0.5A:
-  ```
-  SET CURRENT 0.5
-  ```
-- Switch to voltage mode and set target voltage to 2.0V:
-  ```
-  MODE VOLTAGE
-  SET VOLTAGE 2.0
-  ```
-
-### Command Feedback and Error Handling
-
-- After each command, the system prints feedback via UART1, for example:
-  - `[UART4] Switched to CURRENT control mode.`
-  - `[UART4] Set target voltage: 2.000 V`
-  - `[UART4] Voltage out of range (-12.0~12.0 V)!`
-  - `[UART4] Unknown command: ...`
-- If you enter an invalid command (missing parameter, out of range, typo, etc.), you will get a clear error message.
-- Commands and parameters are case-insensitive.
-- Each command should end with Enter or newline.
-
-### Notes
-
-- Only the four commands above are supported. Any other input will result in an "Unknown command" message.
-- The CLI is initialized in `main.c` and does not require manual activation.
-- Using the CLI does not affect the main communication protocol or normal device operation.
-
-## 7. Host UI (PC Tool)
-
-A cross-platform Python GUI tool is provided in the `scripts/` directory for real-time communication, control, and data visualization with the SafeMRC embedded controller.
+A cross-platform Python GUI tool and SDK are provided in the `scripts/` directory for real-time communication, control, and data visualization with the SafeMRC embedded controller.
 
 ### Main Features
 - Serial port auto-detection and high-speed communication (up to 4 Mbps)
@@ -457,6 +390,7 @@ A cross-platform Python GUI tool is provided in the `scripts/` directory for rea
 - Data recording, export to CSV, and time axis reset
 - Robust multithreading for smooth UI experience
 - Hexadecimal TX/RX message display for protocol debugging
+- Python SDK for scripting and automation
 
 ### How to Use
 1. Install dependencies and launch the UI as described in `scripts/README.md`.
@@ -469,7 +403,7 @@ A cross-platform Python GUI tool is provided in the `scripts/` directory for rea
 - Time axis in exported data matches the UI plots for easy comparison.
 
 ### Protocol Consistency
-- The host UI and embedded firmware use **identical communication protocols and CRC algorithms**.
+- The host UI, SDK, and embedded firmware use **identical communication protocols and CRC algorithms**.
 - Any protocol changes must be updated in both the embedded code and the UI tool to ensure compatibility.
 
 ### Debugging & Troubleshooting
@@ -478,16 +412,7 @@ A cross-platform Python GUI tool is provided in the `scripts/` directory for rea
 - If protocol errors occur, verify that both sides use the same baud rate, frame format, and CRC settings.
 - For further details, see the troubleshooting section in `scripts/README.md`.
 
-## SafeMRC SDK Usage
-
-The SafeMRC SDK enables Python communication with SafeMRC devices via serial port.
-
-### Key Classes
-- `SafeMRCCmd`: Command structure (mode, current, id)
-- `SafeMRCData`: Feedback structure (id, mode, collision, encoder, velocity, current)
-- `SafeMRC`: Main SDK class for serial protocol and communication
-
-### Example: Basic Communication
+### Example: Python SDK Usage
 ```python
 from safeMRC_sdk import SafeMRC, SafeMRCCmd, SafeMRCData
 import time
@@ -503,47 +428,6 @@ else:
     print("No valid response or CRC error.")
 ```
 
-### Example: Continuous Control
-```python
-for i in range(10):
-    cmd.current = 0.1 * i
-    if safe_mrc.sendRecv(cmd, fbk):
-        print(f"Step {i}: encoder={fbk.encoder:.5f}, velocity={fbk.velocity:.5f}")
-    time.sleep(0.1)
-```
+---
 
-### SafeMRC Modes
-
-| Mode Value | Name         | Description                                 |
-|:----------:|:------------|:--------------------------------------------|
-| 0          | FREE        | Free mode (no active control, output off)   |
-| 1          | FIX_LIMIT   | Fixed limit mode (position/safety limit)    |
-| 2          | ADAPTATION  | Adaptation mode (compliance, soft control)  |
-| 3          | DEBUG       | Debug mode (for development/testing)        |
-
-### SafeMRC Communication Protocol
-
-#### Command Frame Structure
-| Field         | Type      | Bytes | Description                        |
-|:-------------|:----------|:-----:|:-----------------------------------|
-| Header       | uint8[2]  | 2     | 0xFE, 0xEE (frame header)          |
-| ID           | uint8     | 1     | Device ID                          |
-| Mode         | uint8     | 1     | Control mode (see table above)     |
-| Current      | int32     | 4     | Desired coil current (mA, little-endian) |
-| CRC16        | uint16    | 2     | CRC-CCITT checksum (little-endian) |
-| **Total**    |           | **10**|                                   |
-
-#### Feedback Frame Structure
-| Field         | Type      | Bytes | Description                        |
-|:-------------|:----------|:-----:|:-----------------------------------|
-| Header       | uint8[2]  | 2     | 0xFE, 0xEE (frame header)          |
-| ID           | uint8     | 1     | Device ID                          |
-| Mode         | uint8     | 1     | Current mode                       |
-| Collision    | uint8     | 1     | Collision flag (0: safe, 1: collision) |
-| Encoder      | int32     | 4     | Encoder value (signed, little-endian) |
-| Velocity     | int32     | 4     | Encoder velocity (signed, little-endian) |
-| Current      | int16     | 2     | Present current (signed, little-endian, mA) |
-| CRC16        | uint16    | 2     | CRC-CCITT checksum (little-endian) |
-| **Total**    |           | **17**|                                   |
-
-**Note:** All multi-byte fields use little-endian byte order. CRC is calculated over all bytes except the CRC field itself.
+**If you have any questions or need further help, just ask!**

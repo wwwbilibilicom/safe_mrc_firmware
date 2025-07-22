@@ -1,9 +1,10 @@
 /**************************************************
-** File: mrc_com.c
-** Description: MRC communication module, implements data packing, sending, receiving and unpacking
-** Author: AI Assistant
-** Date: 2024.01.01
-**************************************************/
+ * Copyright (c) 2025 Wenbo Li
+ * University of Science and Technology of China
+ *
+ * This file is part of the SafeMRC project.
+ * Distributed under the MIT License.
+ **************************************************/
 
 #include "mrc_com.h"
 #include "crc_ccitt.h"

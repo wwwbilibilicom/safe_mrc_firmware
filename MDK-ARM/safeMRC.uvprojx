@@ -394,11 +394,6 @@
           <GroupName>Application/User/Device</GroupName>
           <Files>
             <File>
-              <FileName>Array_user.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Device\Src\Array_user.c</FilePath>
-            </File>
-            <File>
               <FileName>crc_ccitt.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Device\Src\crc_ccitt.c</FilePath>
@@ -407,11 +402,6 @@
               <FileName>drv_mrc.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Device\Src\drv_mrc.c</FilePath>
-            </File>
-            <File>
-              <FileName>trajectory.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Device\Src\trajectory.c</FilePath>
             </File>
             <File>
               <FileName>drv_encoder.c</FileName>

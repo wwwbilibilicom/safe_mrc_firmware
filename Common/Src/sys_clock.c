@@ -1,3 +1,11 @@
+/**************************************************
+ * Copyright (c) 2025 Wenbo Li
+ * University of Science and Technology of China
+ *
+ * This file is part of the SafeMRC project.
+ * Distributed under the MIT License.
+ **************************************************/
+
 #include "sys_clock.h"
 #include "stm32h7xx_hal.h"
 

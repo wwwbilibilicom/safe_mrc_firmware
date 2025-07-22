@@ -1,4 +1,12 @@
-#ifndef __DRV_VNH7040_H__
+/**************************************************
+ * Copyright (c) 2025 Wenbo Li
+ * University of Science and Technology of China
+ *
+ * This file is part of the SafeMRC project.
+ * Distributed under the MIT License.
+ **************************************************/
+
+ #ifndef __DRV_VNH7040_H__
 #define __DRV_VNH7040_H__
 
 #ifdef __cplusplus

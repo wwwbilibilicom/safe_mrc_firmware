@@ -1,6 +1,10 @@
-//
-// Created by wenbo on 24-9-7.
-//
+/**************************************************
+ * Copyright (c) 2025 Wenbo Li
+ * University of Science and Technology of China
+ *
+ * This file is part of the SafeMRC project.
+ * Distributed under the MIT License.
+ **************************************************/
 
 #ifndef __DRV_MRC_H__
 #define __DRV_MRC_H__

@@ -1,9 +1,13 @@
-//
-// Created by wenbo on 24-9-7.
-//
+/**************************************************
+ * Copyright (c) 2025 Wenbo Li
+ * University of Science and Technology of China
+ *
+ * This file is part of the SafeMRC project.
+ * Distributed under the MIT License.
+ **************************************************/
+
 #include "math.h"
 #include "drv_mrc.h"
-#include "Array_user.h"
 #include "stdio.h"
 #include "crc_ccitt.h"
 #include "string.h"

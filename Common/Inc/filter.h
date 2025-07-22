@@ -1,3 +1,11 @@
+/**************************************************
+ * Copyright (c) 2025 Wenbo Li
+ * University of Science and Technology of China
+ *
+ * This file is part of the SafeMRC project.
+ * Distributed under the MIT License.
+ **************************************************/
+
 #ifndef __FILTER_H__
 #define __FILTER_H__
 
