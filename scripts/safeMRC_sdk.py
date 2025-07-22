@@ -192,6 +192,24 @@ class SafeMRC:
         except Exception as e:
             print(f"Parse SafeMRC feedback failed: {e}")
             return None
+    def reset(self):
+        """
+        Reset SafeMRC device
+        """
+        cmd = SafeMRCCmd(mode=0, current=0.0)
+        self.sendRecv(cmd, None)
+    def set_mode(self, mode):
+        """
+        Set SafeMRC mode
+        """
+        cmd = SafeMRCCmd(mode=mode, current=0.0)
+        self.sendRecv(cmd, None)
+    def set_current(self, current):
+        """
+        Set SafeMRC current
+        """
+        cmd = SafeMRCCmd(mode=self.mode, current=current)
+        self.sendRecv(cmd, None)
 
 if __name__ == '__main__':
     print("SafeMRC SDK Simple Test Program")

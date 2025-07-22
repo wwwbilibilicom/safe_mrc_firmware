@@ -4,6 +4,19 @@
 
 SafeMRC is an embedded control system for Magnetorheological Clutch (MRC) devices based on STM32H7 microcontrollers. The system provides precise torque, current, and voltage control, real-time collision detection, and robust communication capabilities.
 
+![](assets/20250722_230133_hardware.png)
+
+## Hardware Requirements
+
+- safeMRC control board
+- MRC device
+- Power supply (e.g., 12~48V DC)
+
+## Software Requirements
+
+- MDK-Keil (version 5.0 or newer)
+- STM32CubeMX (version 6.2.0 or later)
+
 ## Features
 
 - **Precise Torque/Current/Voltage Control**: Supports both voltage and current (feedforward+PI) control modes, with easy switching.
@@ -39,18 +52,19 @@ safe-MRC/
 
 ### Control Modes
 
-| Enum Name               | Value | Description                |
-|------------------------|-------|----------------------------|
-| `MRC_VOLTAGE_CONTROL`  | 0     | Voltage control mode       |
-| `MRC_CURRENT_CONTROL`  | 1     | Coil current control mode  |
+
+| Enum Name             | Value | Description               |
+| ----------------------- | ------- | --------------------------- |
+| `MRC_VOLTAGE_CONTROL` | 0     | Voltage control mode      |
+| `MRC_CURRENT_CONTROL` | 1     | Coil current control mode |
 
 ### Key Reaction Logic
 
-- **KEY1**:  
-  - Voltage mode: Decrease voltage by 1V per press  
+- **KEY1**:
+  - Voltage mode: Decrease voltage by 1V per press
   - Current mode: Decrease target current by 0.1A per press
-- **KEY2**:  
-  - Voltage mode: Increase voltage by 1V per press  
+- **KEY2**:
+  - Voltage mode: Increase voltage by 1V per press
   - Current mode: Increase target current by 0.1A per press
 - **LED1/LED2**: Toggle on key press for feedback.
 - **UART**: Prints current set value after each key press.
@@ -84,8 +98,9 @@ safe-MRC/
 - **Purpose**: Compensates for H-bridge dead-zone and nonlinearity at low voltages.
 - **Table Data**: (Current is for reference only; focus on voltage mapping)
 
+
 | Target Voltage (V) | Measured Voltage (V) | Duty Cycle (0~1) | Output Current (A) |
-| ------------------ | -------------------- | ---------------- | ------------------ |
+| -------------------- | ---------------------- | ------------------ | -------------------- |
 | 0                  | 0.0017               | 0                | -0.062             |
 | 0.1                | 0.0017               | 0.00833          | -0.062             |
 | 0.2                | 0.0017               | 0.01667          | 0.062              |
@@ -98,21 +113,22 @@ safe-MRC/
 
 ### Device_MRC_t Main Members
 
-| Member                  | Type/Macro             | Description                        |
-|------------------------|------------------------|-------------------------------------|
-| `state_phase`          | `MRC_State`            | State machine phase                 |
-| `collision_threshold`  | `float`                | Collision detection threshold       |
-| `COLLISION_REACT_FLAG` | `uint8_t`              | Collision reaction flag             |
-| `com`                  | `MRC_Com_t`            | Communication structure             |
-| `LED1`, `LED2`         | `device_led_t`         | LEDs for feedback                   |
-| `KEY1`, `KEY2`         | `device_key_t`         | Keys for user input                 |
-| `Encoder`              | `Device_encoder_t`     | Encoder feedback                    |
-| `VNH7040`              | `Device_VNH7040_t`     | H-bridge driver                     |
-| `coil_pid`             | `PID_Controller`       | Coil current PI controller          |
-| `coil_current_filter`  | `SimpleLowPassFilter`  | Coil current low-pass filter        |
-| `control_mode`         | `MRC_ControlMode`      | Control mode (voltage/current)      |
-| `statemachine`         | `MRC_StateMachine_t`   | State machine for safety/mode mgmt  |
-| ...                    | ...                    | ...                                 |
+
+| Member                 | Type/Macro            | Description                        |
+| ------------------------ | ----------------------- | ------------------------------------ |
+| `state_phase`          | `MRC_State`           | State machine phase                |
+| `collision_threshold`  | `float`               | Collision detection threshold      |
+| `COLLISION_REACT_FLAG` | `uint8_t`             | Collision reaction flag            |
+| `com`                  | `MRC_Com_t`           | Communication structure            |
+| `LED1`, `LED2`         | `device_led_t`        | LEDs for feedback                  |
+| `KEY1`, `KEY2`         | `device_key_t`        | Keys for user input                |
+| `Encoder`              | `Device_encoder_t`    | Encoder feedback                   |
+| `VNH7040`              | `Device_VNH7040_t`    | H-bridge driver                    |
+| `coil_pid`             | `PID_Controller`      | Coil current PI controller         |
+| `coil_current_filter`  | `SimpleLowPassFilter` | Coil current low-pass filter       |
+| `control_mode`         | `MRC_ControlMode`     | Control mode (voltage/current)     |
+| `statemachine`         | `MRC_StateMachine_t`  | State machine for safety/mode mgmt |
+| ...                    | ...                   | ...                                |
 
 **All members and functions are documented in the header files with clear comments.**
 
@@ -136,26 +152,28 @@ safe-MRC/
 
 #### Command Message (Host → Device, 10 bytes)
 
-| Byte Index | Field Name        | Size (bytes) | Description                          |
-| ---------- | ---------------- | ------------ | ------------------------------------ |
-| 0-1        | Header           | 2            | Frame header, fixed 0xFE, 0xEE       |
-| 2          | Device ID        | 1            | Target device address (0-255)        |
-| 3          | Mode             | 1            | Work mode (see below)                |
-| 4-7        | Target Current   | 4            | Desired coil current, int32, little-endian (mA) |
-| 8-9        | CRC-16-CCITT     | 2            | CRC of bytes 0-7, little-endian      |
+
+| Byte Index | Field Name     | Size (bytes) | Description                                     |
+| ------------ | ---------------- | -------------- | ------------------------------------------------- |
+| 0-1        | Header         | 2            | Frame header, fixed 0xFE, 0xEE                  |
+| 2          | Device ID      | 1            | Target device address (0-255)                   |
+| 3          | Mode           | 1            | Work mode (see below)                           |
+| 4-7        | Target Current | 4            | Desired coil current, int32, little-endian (mA) |
+| 8-9        | CRC-16-CCITT   | 2            | CRC of bytes 0-7, little-endian                 |
 
 #### Feedback Message (Device → Host, 17 bytes)
 
-| Byte Index | Field Name        | Size (bytes) | Description                                 |
-| ---------- | ---------------- | ------------ | ------------------------------------------- |
-| 0-1        | Header           | 2            | Frame header, fixed 0xFE, 0xEE              |
-| 2          | Device ID        | 1            | Responding device address                   |
-| 3          | Mode             | 1            | Current work mode                           |
-| 4          | Collision Flag   | 1            | 0: safe, 1: collision detected              |
-| 5-8        | Encoder Value    | 4            | Encoder reading, int32, little-endian (deg*1000) |
+
+| Byte Index | Field Name       | Size (bytes) | Description                                                 |
+| ------------ | ------------------ | -------------- | ------------------------------------------------------------- |
+| 0-1        | Header           | 2            | Frame header, fixed 0xFE, 0xEE                              |
+| 2          | Device ID        | 1            | Responding device address                                   |
+| 3          | Mode             | 1            | Current work mode                                           |
+| 4          | Collision Flag   | 1            | 0: safe, 1: collision detected                              |
+| 5-8        | Encoder Value    | 4            | Encoder reading, int32, little-endian (deg*1000)            |
 | 9-12       | Encoder Velocity | 4            | Encoder angular velocity, int32, little-endian (deg/s*1000) |
-| 13-14      | Present Current  | 2            | Current torque, int16, little-endian (mA)   |
-| 15-16      | CRC-16-CCITT     | 2            | CRC of bytes 0-14, little-endian            |
+| 13-14      | Present Current  | 2            | Current torque, int16, little-endian (mA)                   |
+| 15-16      | CRC-16-CCITT     | 2            | CRC of bytes 0-14, little-endian                            |
 
 **Note:** All multi-byte fields use little-endian byte order. CRC is calculated over all bytes except the CRC field itself.
 
@@ -175,8 +193,9 @@ uint16_t crc_ccitt(uint16_t crc, const uint8_t *data, size_t len);
 
 #### Mode Field Definition (MRC_Mode)
 
+
 | Value | Name       | Description           |
-| ----- | ---------- | --------------------- |
+| ------- | ------------ | ----------------------- |
 | 0     | FREE       | Free mode (no output) |
 | 1     | FIX_LIMIT  | Fixed limit mode      |
 | 2     | ADAPTATION | Adaptation mode       |
@@ -197,8 +216,9 @@ uint16_t crc_ccitt(uint16_t crc, const uint8_t *data, size_t len);
 
 ## 7. Timer Resource Allocation
 
+
 | Timer | Purpose/Function                       | Channel(s) | Notes/Details                                     |
-| ----- | -------------------------------------- | ---------- | ------------------------------------------------- |
+| ------- | ---------------------------------------- | ------------ | --------------------------------------------------- |
 | TIM1  | Encoder PWM capture (input capture)    | CH4        | Used for reading encoder PWM signal               |
 | TIM2  | PWM generation for VNH7040 driver      | CH1        | Main PWM output for motor driver                  |
 | TIM3  | (Available/Reserved for PWM)           | CH1, CH2   | Initialized for PWM, not actively used            |
@@ -383,6 +403,7 @@ For technical support or questions, please open an issue on the project reposito
 A cross-platform Python GUI tool and SDK are provided in the `scripts/` directory for real-time communication, control, and data visualization with the SafeMRC embedded controller.
 
 ### Main Features
+
 - Serial port auto-detection and high-speed communication (up to 4 Mbps)
 - Control panel for mode, frequency, current, and device ID
 - Real-time display of all feedback fields (angle, velocity, current, mode, collision flag, CRC, etc.)
@@ -393,26 +414,31 @@ A cross-platform Python GUI tool and SDK are provided in the `scripts/` director
 - Python SDK for scripting and automation
 
 ### How to Use
+
 1. Install dependencies and launch the UI as described in `scripts/README.md`.
 2. Select the correct serial port and connect.
 3. Set control parameters and device ID as needed.
 4. Start/stop data recording, export CSV, and clear plots as required.
 
 ### Data Export & Analysis
+
 - All feedback data (with high-precision timestamps) can be exported as CSV for offline analysis.
 - Time axis in exported data matches the UI plots for easy comparison.
 
 ### Protocol Consistency
+
 - The host UI, SDK, and embedded firmware use **identical communication protocols and CRC algorithms**.
 - Any protocol changes must be updated in both the embedded code and the UI tool to ensure compatibility.
 
 ### Debugging & Troubleshooting
+
 - If the UI cannot connect, check serial port permissions, cable quality, and device power.
 - For high-speed operation, use a reliable USB-to-serial adapter.
 - If protocol errors occur, verify that both sides use the same baud rate, frame format, and CRC settings.
 - For further details, see the troubleshooting section in `scripts/README.md`.
 
 ### Example: Python SDK Usage
+
 ```python
 from safeMRC_sdk import SafeMRC, SafeMRCCmd, SafeMRCData
 import time
