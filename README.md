@@ -4,7 +4,7 @@
 
 SafeMRC is an embedded control system for Magnetorheological Clutch (MRC) devices based on STM32H7 microcontrollers. The system provides precise torque, current, and voltage control, real-time collision detection, and robust communication capabilities.
 
-![hardware](assets/hardware.png)
+![hardware](images/hardware.png)
 
 ## Hardware Requirements
 
