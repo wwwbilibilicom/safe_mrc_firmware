@@ -150,7 +150,7 @@ int main(void)
       // }
       
       Encoder_Calibrate_n_Filter(&MRC.Encoder);
-      MRC_collision_detect(&MRC);
+      //MRC_collision_detect(&MRC);
       MRC.filtered_coil_current = MRC_Update_Coil_Current(&MRC);
       MRC.coil_current_update_flag = 0;
     }

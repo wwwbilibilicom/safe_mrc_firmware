@@ -3,4 +3,4 @@ MDK-ARM/.vscode
 .vscode
 scripts/__pycache__
 scripts/build
-scritps/data/
+scripts/data/

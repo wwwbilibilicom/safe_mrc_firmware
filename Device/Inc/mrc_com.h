@@ -9,13 +9,15 @@ extern "C"
 #include "main.h"
 #include "mrc_protocol.h"
 
+#define MRC_CMD_MSG_BUFFER_SIZE 100
+
 #pragma pack(1)
     typedef struct MRC_Com_t
     {
         uint8_t id;
 
         MRC_Cmd_Protocol cmd_msg; // Command message structure
-        uint8_t cmd_msg_buffer[sizeof(MRC_Cmd_Protocol)]; // DMA buffer for command message
+        uint8_t cmd_msg_buffer[MRC_CMD_MSG_BUFFER_SIZE]; // DMA buffer for command message
         MRC_Fbk_Protocol fbk_msg; // Feedback message structure
 
         UART_HandleTypeDef *mrc_huart; // UART handle for communication

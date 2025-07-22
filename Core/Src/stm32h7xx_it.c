@@ -376,12 +376,20 @@ void USART2_IRQHandler(void)
   {
     __HAL_UART_CLEAR_IDLEFLAG(&huart2);
     HAL_UART_DMAStop(&huart2);
-    MRC.com.RxFlag = 1;
-    memcpy(&MRC.com.cmd_msg, MRC.com.cmd_msg_buffer, MRC.com.RxLen);
-    memset(MRC.com.cmd_msg_buffer, 0, MRC.com.RxLen);
-    HAL_UART_Receive_DMA(MRC.com.mrc_huart, MRC.com.cmd_msg_buffer, MRC.com.RxLen);
+    uint16_t len = MRC_CMD_MSG_BUFFER_SIZE - __HAL_DMA_GET_COUNTER(&hdma_usart2_rx);
+    if(len == MRC.com.RxLen &&
+       MRC.com.cmd_msg_buffer[0] == 0xFE &&
+       MRC.com.cmd_msg_buffer[1] == 0xEE)
+    {
+        memcpy(&MRC.com.cmd_msg, MRC.com.cmd_msg_buffer, MRC.com.RxLen);
+        MRC.com.RxFlag = 1;
+    }
+    else
+    {
+        memset(MRC.com.cmd_msg_buffer, 0, MRC_CMD_MSG_BUFFER_SIZE);
+    }
+    HAL_UART_Receive_DMA(MRC.com.mrc_huart, MRC.com.cmd_msg_buffer, MRC_CMD_MSG_BUFFER_SIZE);
   }
-
   /* USER CODE END USART2_IRQn 1 */
 }
 
