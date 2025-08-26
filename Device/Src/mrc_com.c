@@ -66,6 +66,7 @@ int MRC_Com_Init(MRC_Com_t *mrc_com, UART_HandleTypeDef *huart, uint8_t id)
  */
 int MRC_Com_UnpackCmd(MRC_Com_t *mrc_com)
 {
+    getFreq(&mrc_com->freq_calculator);
     if (mrc_com == NULL) {
         return -1;
     }

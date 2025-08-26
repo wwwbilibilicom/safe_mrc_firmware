@@ -17,6 +17,16 @@ extern "C" {
 
 uint32_t getCurrentTime(void);
 uint64_t getHighResTime_ns(void);
+#pragma pack(1)
+    typedef struct
+    {
+        uint64_t CurrentSampleTime;
+        uint64_t PreviousSampleTime;
+        float Freq;
+    } Caculate_Freq_t;
+#pragma pack()
+
+float getFreq(Caculate_Freq_t *freq);
 
 #ifdef __cplusplus
 }

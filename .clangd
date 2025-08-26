@@ -1,15 +1,15 @@
 CompileFlags:
   Add:
-    - '-Ig:\lab\project\MRF_Bearing_Lock\embeded_code\safe-MRC/RTE/_safeMRC'
-    - '-ID:\Program Files\Keil_v5\ARM\ARMCC\include'
-    - '-ID:\Program Files\Keil_v5\ARM\ARMCC\include\rw'
-    - '-ICore\Inc'
-    - '-IDrivers\STM32H7xx_HAL_Driver\Inc'
-    - '-IDrivers\STM32H7xx_HAL_Driver\Inc\Legacy'
-    - '-IDrivers\CMSIS\Device\ST\STM32H7xx\Include'
-    - '-IDrivers\CMSIS\Include'
-    - '-IDevice\Inc'
-    - '-ICommon\Inc'
+    - '--target=arm-none-eabi'
+    - '-I"c:/Program Files/Keil_v5/ARM/ARMCC/include"'
+    - '-I"c:/Program Files/Keil_v5/ARM/ARMCC/include/rw"'
+    - '-Ic:/Users/12535/Desktop/safe-mrc/Core/Inc'
+    - '-Ic:/Users/12535/Desktop/safe-mrc/Drivers/STM32H7xx_HAL_Driver/Inc'
+    - '-Ic:/Users/12535/Desktop/safe-mrc/Drivers/STM32H7xx_HAL_Driver/Inc/Legacy'
+    - '-Ic:/Users/12535/Desktop/safe-mrc/Drivers/CMSIS/Device/ST/STM32H7xx/Include'
+    - '-Ic:/Users/12535/Desktop/safe-mrc/Drivers/CMSIS/Include'
+    - '-Ic:/Users/12535/Desktop/safe-mrc/Device/Inc'
+    - '-Ic:/Users/12535/Desktop/safe-mrc/Common/Inc'
     - '-DUSE_HAL_DRIVER'
     - '-DSTM32H750xx'
     - '-DUSE_PWR_LDO_SUPPLY'
@@ -85,4 +85,11 @@ CompileFlags:
     - '-D__wfi()='
     - '-D__yield()='
     - '-D__vfp_status(x,y)=0'
-  Compiler: D:\Program Files\Keil_v5\ARM\ARMCC\bin\armcc.exe
+  Compiler: C:/Program Files/Keil_v5/ARM/ARMCC/bin/armcc.exe
+
+
+---
+If:
+  PathMatch: */CMSIS/.*
+Diagnostics:
+  Suppress: ["*", undeclared_var_use_suggest]

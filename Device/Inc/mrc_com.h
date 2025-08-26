@@ -16,6 +16,7 @@ extern "C"
 
 #include "main.h"
 #include "mrc_protocol.h"
+#include "sys_clock.h"
 
 #define MRC_CMD_MSG_BUFFER_SIZE 100
 
@@ -35,6 +36,11 @@ extern "C"
         uint16_t TxLen; // Length of the transmitted data
 
         uint8_t cmd_correct; // 0: error, 1: correct
+        Caculate_Freq_t freq_calculator; // Frequency structure
+
+        uint64_t time_delay; // Time delay for command message
+        uint64_t rx_time; // Time of command message received
+        uint64_t tx_time; // Time of feedback message sent
     } MRC_Com_t;
 #pragma pack()
 

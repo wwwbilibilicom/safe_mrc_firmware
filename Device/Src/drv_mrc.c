@@ -11,6 +11,7 @@
 #include "stdio.h"
 #include "crc_ccitt.h"
 #include "string.h"
+#include "sys_clock.h"
 
 extern DMA_HandleTypeDef hdma_usart2_rx;
 
@@ -222,10 +223,25 @@ int8_t MRC_SetMode(Device_MRC_t *mrc, MRC_Mode mode)
  * @note Extract command and send feedback automatically
  */
 void MRC_Com_Process(Device_MRC_t *MRC)
+
 {
     // Check if new command received (RxFlag set by UART IDLE interrupt)
     if (MRC->com.RxFlag == 1) {
         if(MRC->com.cmd_msg.id == MRC->com.id){
+            
+            // Prepare feedback data
+            int32_t encoder_value = (int32_t)(MRC->Encoder.CurrentEncoderValRad * 65535);
+            int32_t encoder_velocity = (int32_t)(MRC->Encoder.filtered_anguvel*1000);
+            int32_t present_current = (int32_t)(MRC->filtered_coil_current * 1000); // Use actual voltage as torque indicator
+            uint8_t collision_flag = MRC->COLLISION_REACT_FLAG; // Use correct collision flag
+            
+            // Pack feedback message with current device status
+            if (MRC_Com_PackFbk(&MRC->com, MRC->statemachine.current_mode, encoder_value, encoder_velocity, present_current, collision_flag) == 0) {
+                // Send feedback response
+                MRC_Com_SendFbk(&MRC->com);
+                MRC->com.tx_time = getHighResTime_ns();
+                MRC->com.time_delay = MRC->com.tx_time - MRC->com.rx_time;
+            }
 
             // Unpack and validate command message from DMA buffer
             if (MRC_Com_UnpackCmd(&MRC->com) == 0) {
@@ -238,18 +254,6 @@ void MRC_Com_Process(Device_MRC_t *MRC)
                     {
                         MRC->des_coil_current = ((float)MRC->com.cmd_msg.des_coil_current) / 1000.0f;
                     }
-                }
-                
-                // Prepare feedback data
-                int32_t encoder_value = (int32_t)(MRC->Encoder.CurrentEncoderValRad * 65535);
-                int32_t encoder_velocity = (int32_t)(MRC->Encoder.filtered_anguvel*1000);
-                int32_t present_current = (int32_t)(MRC->filtered_coil_current * 1000); // Use actual voltage as torque indicator
-                uint8_t collision_flag = MRC->COLLISION_REACT_FLAG; // Use correct collision flag
-                
-                // Pack feedback message with current device status
-                if (MRC_Com_PackFbk(&MRC->com, MRC->statemachine.current_mode, encoder_value, encoder_velocity, present_current, collision_flag) == 0) {
-                    // Send feedback response
-                    MRC_Com_SendFbk(&MRC->com);
                 }
             }
         }

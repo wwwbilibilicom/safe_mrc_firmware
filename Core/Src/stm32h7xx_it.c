@@ -26,6 +26,7 @@
 #include "string.h"
 extern Device_MRC_t MRC;
 #include "mrc_debugcli.h"
+#include "sys_clock.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -374,6 +375,8 @@ void USART2_IRQHandler(void)
   /* USER CODE BEGIN USART2_IRQn 1 */
   if(__HAL_UART_GET_FLAG(&huart2, UART_FLAG_IDLE) != RESET)
   {
+    MRC.com.rx_time = getHighResTime_ns();
+
     __HAL_UART_CLEAR_IDLEFLAG(&huart2);
     HAL_UART_DMAStop(&huart2);
     uint16_t len = MRC_CMD_MSG_BUFFER_SIZE - __HAL_DMA_GET_COUNTER(&hdma_usart2_rx);

@@ -31,3 +31,19 @@ uint64_t getHighResTime_ns(void)
     ns = (uint64_t)ms * 1000000ULL + (uint64_t)tick_in_ms * ns_per_tick;
     return ns;
 }
+
+float getFreq(Caculate_Freq_t *freq)
+{
+    freq->CurrentSampleTime = getHighResTime_ns();
+    uint64_t deltaTime_ns = freq->CurrentSampleTime - freq->PreviousSampleTime;
+    if(deltaTime_ns > 0)
+    {
+        freq->Freq = 1/(deltaTime_ns * 1e-9f);
+    }
+    else
+    {
+        freq->Freq = 0.0f;
+    }
+    freq->PreviousSampleTime = freq->CurrentSampleTime;
+    return freq->Freq;
+}
