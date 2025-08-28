@@ -50,7 +50,8 @@ int MRC_Com_Init(MRC_Com_t *mrc_com, UART_HandleTypeDef *huart, uint8_t id)
     mrc_com->fbk_msg.encoder_value = 0;
     mrc_com->fbk_msg.present_current = 0;
     mrc_com->fbk_msg.CRC16Data = 0;
-
+    
+    __HAL_UART_ENABLE_IT(mrc_com->mrc_huart,UART_IT_RXNE);
     __HAL_UART_ENABLE_IT(mrc_com->mrc_huart, UART_IT_IDLE);
     
     // Start DMA reception for command messages

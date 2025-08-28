@@ -38,7 +38,7 @@ extern "C"
         uint8_t cmd_correct; // 0: error, 1: correct
         Caculate_Freq_t freq_calculator; // Frequency structure
 
-        uint64_t time_delay; // Time delay for command message
+        float time_delay; // Time delay for command message
         uint64_t rx_time; // Time of command message received
         uint64_t tx_time; // Time of feedback message sent
     } MRC_Com_t;

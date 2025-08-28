@@ -377,9 +377,9 @@ void USART2_IRQHandler(void)
   {
     MRC.com.rx_time = getHighResTime_ns();
 
+    uint16_t len = MRC_CMD_MSG_BUFFER_SIZE - __HAL_DMA_GET_COUNTER(&hdma_usart2_rx);
     __HAL_UART_CLEAR_IDLEFLAG(&huart2);
     HAL_UART_DMAStop(&huart2);
-    uint16_t len = MRC_CMD_MSG_BUFFER_SIZE - __HAL_DMA_GET_COUNTER(&hdma_usart2_rx);
     if(len == MRC.com.RxLen &&
        MRC.com.cmd_msg_buffer[0] == 0xFE &&
        MRC.com.cmd_msg_buffer[1] == 0xEE)
@@ -391,6 +391,21 @@ void USART2_IRQHandler(void)
     {
         memset(MRC.com.cmd_msg_buffer, 0, MRC_CMD_MSG_BUFFER_SIZE);
     }
+
+    // Prepare feedback data
+    int32_t encoder_value = (int32_t)(MRC.Encoder.CurrentEncoderValRad * 65535);
+    int32_t encoder_velocity = (int32_t)(MRC.Encoder.filtered_anguvel*1000);
+    int32_t present_current = (int32_t)(MRC.filtered_coil_current * 1000); // Use actual voltage as torque indicator
+    uint8_t collision_flag = MRC.COLLISION_REACT_FLAG; // Use correct collision flag
+    
+    // Pack feedback message with current device status
+    if (MRC_Com_PackFbk(&MRC.com, MRC.statemachine.current_mode, encoder_value, encoder_velocity, present_current, collision_flag) == 0) {
+        // Send feedback response
+        MRC_Com_SendFbk(&MRC.com);
+        MRC.com.tx_time = getHighResTime_ns();
+        MRC.com.time_delay = (float)(MRC.com.tx_time - MRC.com.rx_time)/1000.0f;
+    }
+
     HAL_UART_Receive_DMA(MRC.com.mrc_huart, MRC.com.cmd_msg_buffer, MRC_CMD_MSG_BUFFER_SIZE);
   }
   /* USER CODE END USART2_IRQn 1 */
