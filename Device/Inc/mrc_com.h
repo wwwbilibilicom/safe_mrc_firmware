@@ -18,7 +18,7 @@ extern "C"
 #include "mrc_protocol.h"
 #include "sys_clock.h"
 
-#define MRC_CMD_MSG_BUFFER_SIZE 100
+#define MRC_CMD_MSG_BUFFER_SIZE 256
 
 #pragma pack(1)
     typedef struct MRC_Com_t

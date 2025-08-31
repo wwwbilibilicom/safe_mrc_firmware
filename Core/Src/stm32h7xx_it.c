@@ -405,7 +405,7 @@ void USART2_IRQHandler(void)
         MRC.com.tx_time = getHighResTime_ns();
         MRC.com.time_delay = (float)(MRC.com.tx_time - MRC.com.rx_time)/1000.0f;
     }
-
+		//memset(MRC.com.cmd_msg_buffer, 0, MRC_CMD_MSG_BUFFER_SIZE);
     HAL_UART_Receive_DMA(MRC.com.mrc_huart, MRC.com.cmd_msg_buffer, MRC_CMD_MSG_BUFFER_SIZE);
   }
   /* USER CODE END USART2_IRQn 1 */
