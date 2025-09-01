@@ -176,6 +176,8 @@ typedef enum {
 
     int8_t MRC_SetMode(Device_MRC_t *mrc, MRC_Mode mode);
 
+    void MRC_send_data(Device_MRC_t *MRC);
+
 /**
  * @brief Lookup table entry for target-to-measured voltage compensation
  *        Used to correct for nonlinearity in H-bridge output at low voltages.

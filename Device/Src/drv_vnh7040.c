@@ -32,7 +32,7 @@ uint64_t tim_clk_freq = 72000000; // Set the timer clock frequency
  * @note This function will initialize VNH7040's GPIO, PWM and ADC configuration
  * @note Start PWM output and configure ADC calibration and DMA transmission
  */
-void drv_VNH7040_init(  uint8_t const *dev_name, Device_VNH7040_t *device, GPIO_TypeDef *INA, uint16_t INA_PIN,
+void drv_VNH7040_init(const uint8_t  *dev_name, Device_VNH7040_t *device, GPIO_TypeDef *INA, uint16_t INA_PIN,
                 GPIO_TypeDef *INB, uint16_t INB_PIN, TIM_HandleTypeDef *PWM_tim, uint32_t PWM_channel)
 {
     device->PWM_tim = PWM_tim; // PWM timer handle

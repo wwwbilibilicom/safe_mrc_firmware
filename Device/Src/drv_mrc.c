@@ -57,11 +57,7 @@ void MRC_Init(const uint8_t *dev_name, Device_MRC_t *MRC, uint8_t id)
 
     MRC->device_name = dev_name;
     
-    // Initialize MRC communication module
-    if (MRC_Com_Init(&MRC->com, &huart2, id) != 0) {
-        printf("MRC communication initialization failed!\n");
-        return;
-    }
+
     MRC->com.RxFlag = 0;
     // Print SAFEMRC ASCII art and copyright info
     printf("\n");
@@ -115,6 +111,12 @@ void MRC_Init(const uint8_t *dev_name, Device_MRC_t *MRC, uint8_t id)
 
     MRC_StateMachine_Init(&MRC->statemachine);
     printf("Device MRC(%s) state machine initialized successfully!\n", dev_name);
+		
+		// Initialize MRC communication module
+    if (MRC_Com_Init(&MRC->com, &huart2, id) != 0) {
+        printf("MRC communication initialization failed!\n");
+        return;
+    }
 }
 
 /**
@@ -202,6 +204,24 @@ void MRC_collision_detect(Device_MRC_t *MRC)
     }
 }
 
+void MRC_send_data(Device_MRC_t *MRC)
+{
+    // Prepare feedback data
+    int32_t encoder_value = (int32_t)(MRC->Encoder.CurrentEncoderValRad * 65535);
+    int32_t encoder_velocity = (int32_t)(MRC->Encoder.filtered_anguvel*1000);
+    int32_t present_current = (int32_t)(MRC->filtered_coil_current * 1000); // Use actual voltage as torque indicator
+    uint8_t collision_flag = MRC->COLLISION_REACT_FLAG; // Use correct collision flag
+    
+    // Pack feedback message with current device status
+    if (MRC_Com_PackFbk(&MRC->com, MRC->statemachine.current_mode, encoder_value, encoder_velocity, present_current, collision_flag) == 0) {
+        // Send feedback response
+		led_on(&MRC->LED1);// permanently used as USART_DE to set TX enable (this version hardware have RS485 bug)
+        MRC_Com_SendFbk(&MRC->com);
+        MRC->com.tx_time = getHighResTime_ns();
+        MRC->com.time_delay = (float)(MRC->com.tx_time - MRC->com.rx_time)/1000.0f;
+    }
+}
+
 int8_t MRC_SetMode(Device_MRC_t *mrc, MRC_Mode mode)
 {
     if(mrc->COLLISION_REACT_FLAG == 0)
@@ -228,21 +248,6 @@ void MRC_Com_Process(Device_MRC_t *MRC)
     // Check if new command received (RxFlag set by UART IDLE interrupt)
     if (MRC->com.RxFlag == 1) {
         if(MRC->com.cmd_msg.id == MRC->com.id){
-            
-            // // Prepare feedback data
-            // int32_t encoder_value = (int32_t)(MRC->Encoder.CurrentEncoderValRad * 65535);
-            // int32_t encoder_velocity = (int32_t)(MRC->Encoder.filtered_anguvel*1000);
-            // int32_t present_current = (int32_t)(MRC->filtered_coil_current * 1000); // Use actual voltage as torque indicator
-            // uint8_t collision_flag = MRC->COLLISION_REACT_FLAG; // Use correct collision flag
-            
-            // // Pack feedback message with current device status
-            // if (MRC_Com_PackFbk(&MRC->com, MRC->statemachine.current_mode, encoder_value, encoder_velocity, present_current, collision_flag) == 0) {
-            //     // Send feedback response
-            //     MRC_Com_SendFbk(&MRC->com);
-            //     MRC->com.tx_time = getHighResTime_ns();
-            //     MRC->com.time_delay = MRC->com.tx_time - MRC->com.rx_time;
-            // }
-
             // Unpack and validate command message from DMA buffer
             if (MRC_Com_UnpackCmd(&MRC->com) == 0) {
                 // Update device parameters from received command

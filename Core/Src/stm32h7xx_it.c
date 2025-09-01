@@ -27,6 +27,8 @@
 extern Device_MRC_t MRC;
 #include "mrc_debugcli.h"
 #include "sys_clock.h"
+#include "stdio.h"
+#include "crc_ccitt.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -362,7 +364,8 @@ void USART1_IRQHandler(void)
   }
   /* USER CODE END USART1_IRQn 1 */
 }
-
+static int rx_count;
+static int send_count;
 /**
   * @brief This function handles USART2 global interrupt.
   */
@@ -375,38 +378,49 @@ void USART2_IRQHandler(void)
   /* USER CODE BEGIN USART2_IRQn 1 */
   if(__HAL_UART_GET_FLAG(&huart2, UART_FLAG_IDLE) != RESET)
   {
+		
+		rx_count++;
     MRC.com.rx_time = getHighResTime_ns();
-
+		__HAL_UART_CLEAR_IDLEFLAG(MRC.com.mrc_huart);
+		HAL_UART_DMAStop(MRC.com.mrc_huart);
     uint16_t len = MRC_CMD_MSG_BUFFER_SIZE - __HAL_DMA_GET_COUNTER(&hdma_usart2_rx);
-    __HAL_UART_CLEAR_IDLEFLAG(&huart2);
-    HAL_UART_DMAStop(&huart2);
-    if(len == MRC.com.RxLen &&
-       MRC.com.cmd_msg_buffer[0] == 0xFE &&
-       MRC.com.cmd_msg_buffer[1] == 0xEE)
+    printf("[RX_IDLE %08d]: ", rx_count);
+    for (int i = 0; i < MRC.com.RxLen; i++)
+    { 
+      if (i < MRC.com.RxLen-1)
+      {
+        printf("0x%02X ", MRC.com.cmd_msg_buffer[i]);
+      }
+      else
+      {
+        printf("0x%02X ", MRC.com.cmd_msg_buffer[i]);
+      }
+    }
+		printf(" at the length of %d, ", len);
+    if (len == MRC.com.RxLen &&
+        MRC.com.cmd_msg_buffer[0] == 0xFE &&
+        MRC.com.cmd_msg_buffer[1] == 0xEE &&
+        MRC.com.cmd_msg_buffer[2] == MRC.com.id)
     {
-        memcpy(&MRC.com.cmd_msg, MRC.com.cmd_msg_buffer, MRC.com.RxLen);
+      memcpy(&MRC.com.cmd_msg, MRC.com.cmd_msg_buffer, MRC.com.RxLen);
+			uint16_t crc_calculated = crc_ccitt(0xFFFF, (uint8_t *)&MRC.com.cmd_msg, MRC.com.RxLen - 2);
+			uint16_t crc_received = MRC.com.cmd_msg.CRC16Data;
+			printf("with crc_calculated: %x and crc_received: %x\n", crc_calculated, crc_received);
+      if (crc_calculated == crc_received)
+      {
         MRC.com.RxFlag = 1;
+				send_count++;
+				printf("[Send %08d]\n ", send_count);
+        MRC_send_data(&MRC);
+      }
     }
     else
     {
-        memset(MRC.com.cmd_msg_buffer, 0, MRC_CMD_MSG_BUFFER_SIZE);
+      // printf("crc_calculated: %x, crc_received: %x\n", crc_calculated, crc_received);
+			led_off(&MRC.LED1); // permanently used as USART_DE to set RX enable (this version hardware have RS485 bug)
+      memset(MRC.com.cmd_msg_buffer, 0, MRC_CMD_MSG_BUFFER_SIZE);
+      HAL_UART_Receive_DMA(MRC.com.mrc_huart, MRC.com.cmd_msg_buffer, MRC_CMD_MSG_BUFFER_SIZE);
     }
-
-    // Prepare feedback data
-    int32_t encoder_value = (int32_t)(MRC.Encoder.CurrentEncoderValRad * 65535);
-    int32_t encoder_velocity = (int32_t)(MRC.Encoder.filtered_anguvel*1000);
-    int32_t present_current = (int32_t)(MRC.filtered_coil_current * 1000); // Use actual voltage as torque indicator
-    uint8_t collision_flag = MRC.COLLISION_REACT_FLAG; // Use correct collision flag
-    
-    // Pack feedback message with current device status
-    if (MRC_Com_PackFbk(&MRC.com, MRC.statemachine.current_mode, encoder_value, encoder_velocity, present_current, collision_flag) == 0) {
-        // Send feedback response
-        MRC_Com_SendFbk(&MRC.com);
-        MRC.com.tx_time = getHighResTime_ns();
-        MRC.com.time_delay = (float)(MRC.com.tx_time - MRC.com.rx_time)/1000.0f;
-    }
-		//memset(MRC.com.cmd_msg_buffer, 0, MRC_CMD_MSG_BUFFER_SIZE);
-    HAL_UART_Receive_DMA(MRC.com.mrc_huart, MRC.com.cmd_msg_buffer, MRC_CMD_MSG_BUFFER_SIZE);
   }
   /* USER CODE END USART2_IRQn 1 */
 }
