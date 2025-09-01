@@ -246,6 +246,16 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 }
 
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+  if(huart->Instance == USART2)
+  {
+		led_off(&MRC.LED1);// permanently used as USART_DE to set RX enable (this version hardware have RS485 bug)
+    memset(MRC.com.cmd_msg_buffer, 0, MRC_CMD_MSG_BUFFER_SIZE);
+    HAL_UART_Receive_DMA(MRC.com.mrc_huart, MRC.com.cmd_msg_buffer, MRC_CMD_MSG_BUFFER_SIZE);
+  }
+}
+
 int fputc(int ch, FILE *f)
 {
 
